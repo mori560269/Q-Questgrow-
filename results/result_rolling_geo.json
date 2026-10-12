@@ -1,0 +1,163 @@
+{
+ "method": "rolling QUBO (neal)",
+ "unit": 2,
+ "horizon": 3,
+ "score": 0.8837962962962962,
+ "feasible": true,
+ "requirements_met": 16,
+ "requirements_total": 24,
+ "charge_steps": 10,
+ "min_battery": 0,
+ "cov": [
+  1.0,
+  0.636,
+  0.875,
+  0.875,
+  0.667,
+  1.0,
+  1.0,
+  1.0
+ ],
+ "A": [
+  13.0,
+  5.0,
+  10.0,
+  11.0,
+  8.0,
+  15.0,
+  6.0,
+  12.0
+ ],
+ "B": [
+  21.0,
+  8.0,
+  21.0,
+  14.0,
+  7.0,
+  23.0,
+  6.0,
+  10.0
+ ],
+ "total_sec": 11.134110689163208,
+ "solve_sec": 10.954392194747925,
+ "raw_feasible_windows": 4,
+ "windows": [
+  {
+   "t0": 0,
+   "horizon": 3,
+   "unit": 2,
+   "n_vars": 1338,
+   "n_quadratic": 159012,
+   "build_sec": 0.017160415649414062,
+   "solve_sec": 2.5610737800598145,
+   "raw_feasible": 4,
+   "num_samples": 20
+  },
+  {
+   "t0": 2,
+   "horizon": 3,
+   "unit": 2,
+   "n_vars": 1341,
+   "n_quadratic": 150308,
+   "build_sec": 0.014013290405273438,
+   "solve_sec": 2.5102651119232178,
+   "raw_feasible": 1,
+   "num_samples": 20
+  },
+  {
+   "t0": 4,
+   "horizon": 3,
+   "unit": 2,
+   "n_vars": 1332,
+   "n_quadratic": 143734,
+   "build_sec": 0.012065410614013672,
+   "solve_sec": 2.4470877647399902,
+   "raw_feasible": 3,
+   "num_samples": 20
+  },
+  {
+   "t0": 6,
+   "horizon": 3,
+   "unit": 2,
+   "n_vars": 1334,
+   "n_quadratic": 142210,
+   "build_sec": 0.011386394500732422,
+   "solve_sec": 2.2830779552459717,
+   "raw_feasible": 0,
+   "num_samples": 20
+  },
+  {
+   "t0": 8,
+   "horizon": 2,
+   "unit": 2,
+   "n_vars": 892,
+   "n_quadratic": 73897,
+   "build_sec": 0.007491588592529297,
+   "solve_sec": 1.1528875827789307,
+   "raw_feasible": 1,
+   "num_samples": 20
+  }
+ ],
+ "path": [
+  [
+   18,
+   6,
+   12,
+   29,
+   39,
+   48,
+   54,
+   39,
+   53,
+   39
+  ],
+  [
+   52,
+   61,
+   46,
+   39,
+   45,
+   50,
+   51,
+   44,
+   43,
+   57
+  ],
+  [
+   37,
+   23,
+   33,
+   31,
+   39,
+   21,
+   21,
+   12,
+   26,
+   35
+  ],
+  [
+   6,
+   2,
+   5,
+   19,
+   10,
+   25,
+   12,
+   25,
+   10,
+   1
+  ],
+  [
+   56,
+   54,
+   59,
+   43,
+   27,
+   28,
+   46,
+   36,
+   51,
+   46
+  ]
+ ]
+}

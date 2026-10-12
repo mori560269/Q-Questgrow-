@@ -1,0 +1,162 @@
+{
+ "method": "rolling Amplify model (neal)",
+ "unit": 2,
+ "horizon": 3,
+ "score": 0.869074074074074,
+ "feasible": true,
+ "requirements_met": 16,
+ "requirements_total": 24,
+ "charge_steps": 10,
+ "min_battery": 0,
+ "cov": [
+  1.0,
+  0.818,
+  1.0,
+  0.875,
+  0.833,
+  1.0,
+  0.75,
+  0.75
+ ],
+ "A": [
+  14.0,
+  7.0,
+  10.0,
+  12.0,
+  4.0,
+  16.0,
+  9.0,
+  8.0
+ ],
+ "B": [
+  19.0,
+  9.0,
+  15.0,
+  11.0,
+  16.0,
+  14.0,
+  12.0,
+  14.0
+ ],
+ "total_sec": 17.139111518859863,
+ "solve_sec": 16.354806900024414,
+ "windows": [
+  {
+   "t0": 0,
+   "horizon": 3,
+   "unit": 2,
+   "build_sec": 0.36820530891418457,
+   "solve_sec": 3.3958518505096436,
+   "raw_feasible": 3,
+   "num_samples": 20,
+   "n_vars": 1074,
+   "n_quadratic": 144975
+  },
+  {
+   "t0": 2,
+   "horizon": 3,
+   "unit": 2,
+   "build_sec": 0.10175800323486328,
+   "solve_sec": 4.335861921310425,
+   "raw_feasible": 0,
+   "num_samples": 20,
+   "n_vars": 1069,
+   "n_quadratic": 137324
+  },
+  {
+   "t0": 4,
+   "horizon": 3,
+   "unit": 2,
+   "build_sec": 0.1130361557006836,
+   "solve_sec": 4.05208945274353,
+   "raw_feasible": 0,
+   "num_samples": 20,
+   "n_vars": 1106,
+   "n_quadratic": 130752
+  },
+  {
+   "t0": 6,
+   "horizon": 3,
+   "unit": 2,
+   "build_sec": 0.09108281135559082,
+   "solve_sec": 3.162778615951538,
+   "raw_feasible": 1,
+   "num_samples": 20,
+   "n_vars": 1105,
+   "n_quadratic": 129813
+  },
+  {
+   "t0": 8,
+   "horizon": 2,
+   "unit": 2,
+   "build_sec": 0.0305020809173584,
+   "solve_sec": 1.4082250595092773,
+   "raw_feasible": 4,
+   "num_samples": 20,
+   "n_vars": 713,
+   "n_quadratic": 64094
+  }
+ ],
+ "path": [
+  [
+   6,
+   12,
+   25,
+   43,
+   51,
+   38,
+   21,
+   12,
+   29,
+   39
+  ],
+  [
+   33,
+   32,
+   46,
+   36,
+   51,
+   34,
+   19,
+   12,
+   18,
+   4
+  ],
+  [
+   63,
+   52,
+   54,
+   40,
+   39,
+   52,
+   54,
+   39,
+   48,
+   32
+  ],
+  [
+   8,
+   2,
+   11,
+   1,
+   10,
+   17,
+   34,
+   51,
+   59,
+   60
+  ],
+  [
+   53,
+   53,
+   54,
+   40,
+   54,
+   46,
+   51,
+   44,
+   27,
+   36
+  ]
+ ]
+}

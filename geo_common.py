@@ -42,10 +42,12 @@ _jp = [f for f in ["Noto Sans CJK JP", "IPAexGothic", "IPAGothic", "Hiragino San
 plt.rcParams["font.family"] = _jp + ["DejaVu Sans"]
 plt.rcParams["axes.unicode_minus"] = False
 
-# 環境変数 GEO_DATA_PATH で上書き可. 既定はリポジトリ内の data/data_transformed.json
-DATA_PATH = os.environ.get(
-    "GEO_DATA_PATH",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "data_transformed.json"))
+# 環境変数 GEO_DATA_PATH で上書き可. 無ければ リポジトリの data/ → カレントディレクトリ の順に探す
+_here = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.environ.get("GEO_DATA_PATH") or next(
+    (p for p in (os.path.join(_here, "data", "data_transformed.json"), "data_transformed.json")
+     if os.path.exists(p)),
+    os.path.join(_here, "data", "data_transformed.json"))
 
 # ------------------------------------------------------------------ 設定
 GRID_KM = 10.0      # セル一辺 [km]

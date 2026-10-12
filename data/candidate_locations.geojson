@@ -1,0 +1,1301 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "+proj=aeqd +lat_0=0 +lon_0=0 +datum=WGS84 +units=m +no_defs"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -15194.675,
+          -10982.775
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -31460.799,
+          8975.974
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -24595.084,
+          5482.974
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_4"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -24457.364,
+          -1843.471
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_5"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -36243.702,
+          711.397
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_6"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -16237.409,
+          282.108
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_7"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -20347.537,
+          -12941.5
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_8"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -39914.208,
+          -12094.59
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_9"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -27744.929,
+          17167.538
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M01",
+        "municipality_name": "西海市 (Saikai City)",
+        "candidate_id": "P01_10"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -18243.374,
+          11052.538
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M02",
+        "municipality_name": "南山町 (Minamiyama Town)",
+        "candidate_id": "P02_1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3275.744,
+          -19165.202
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M02",
+        "municipality_name": "南山町 (Minamiyama Town)",
+        "candidate_id": "P02_2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -4490.661,
+          -23905.566
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M02",
+        "municipality_name": "南山町 (Minamiyama Town)",
+        "candidate_id": "P02_3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7537.48,
+          -32556.541
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M02",
+        "municipality_name": "南山町 (Minamiyama Town)",
+        "candidate_id": "P02_4"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9701.444,
+          -22704.027
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M02",
+        "municipality_name": "南山町 (Minamiyama Town)",
+        "candidate_id": "P02_5"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -9546.711,
+          -30818.556
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M02",
+        "municipality_name": "南山町 (Minamiyama Town)",
+        "candidate_id": "P02_6"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          6118.316,
+          -36547.736
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M02",
+        "municipality_name": "南山町 (Minamiyama Town)",
+        "candidate_id": "P02_7"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10919.703,
+          -24888.204
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M02",
+        "municipality_name": "南山町 (Minamiyama Town)",
+        "candidate_id": "P02_8"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -8309.823,
+          -46446.405
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M02",
+        "municipality_name": "南山町 (Minamiyama Town)",
+        "candidate_id": "P02_9"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -4895.571,
+          -13686.415
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -25103.43,
+          -43913.501
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -15816.248,
+          -25621.065
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -25907.313,
+          -30900.426
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_4"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -40511.364,
+          -19510.588
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_5"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -18108.585,
+          -35059.191
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_6"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -24600.714,
+          -23537.924
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_7"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -15604.042,
+          -41736.333
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_8"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -20998.972,
+          -19081.687
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_9"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -27966.306,
+          -38736.147
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M03",
+        "municipality_name": "西南市 (Seinan City)",
+        "candidate_id": "P03_10"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -39778.227,
+          -32901.468
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -15879.935,
+          25502.281
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -12502.455,
+          39078.948
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -15697.959,
+          30344.128
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_4"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -11022.109,
+          20504.463
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_5"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -21368.999,
+          28479.859
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_6"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -14852.455,
+          35478.321
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_7"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -11744.312,
+          26643.012
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_8"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -18379.722,
+          16845.419
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_9"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -5516.135,
+          44541.874
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_10"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -5514.143,
+          31986.646
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M04",
+        "municipality_name": "北西市 (Hokusei City)",
+        "candidate_id": "P04_11"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -2506.134,
+          22332.068
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11897.246,
+          44104.935
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3921.763,
+          24434.827
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10063.19,
+          36843.615
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_4"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17215.978,
+          41801.903
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_5"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3387.362,
+          37082.435
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_6"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9473.18,
+          30294.309
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_7"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          4165.397,
+          31065.661
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_8"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -112.192,
+          46030.056
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_9"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12548.527,
+          20880.345
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_10"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17289.873,
+          29312.33
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M05",
+        "municipality_name": "北嶺村 (Hokurei Village)",
+        "candidate_id": "P05_11"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23322.263,
+          39827.039
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M06",
+        "municipality_name": "中央市 (Chuo City)",
+        "candidate_id": "P06_1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8141.483,
+          10493.676
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M06",
+        "municipality_name": "中央市 (Chuo City)",
+        "candidate_id": "P06_2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          5701.419,
+          3545.826
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M06",
+        "municipality_name": "中央市 (Chuo City)",
+        "candidate_id": "P06_3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12560.225,
+          14509.262
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M06",
+        "municipality_name": "中央市 (Chuo City)",
+        "candidate_id": "P06_4"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -4841.822,
+          380.505
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M06",
+        "municipality_name": "中央市 (Chuo City)",
+        "candidate_id": "P06_5"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12542.785,
+          2800.424
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M06",
+        "municipality_name": "中央市 (Chuo City)",
+        "candidate_id": "P06_6"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -3840.803,
+          14121.482
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M06",
+        "municipality_name": "中央市 (Chuo City)",
+        "candidate_id": "P06_7"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -6506.077,
+          -4635.264
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M06",
+        "municipality_name": "中央市 (Chuo City)",
+        "candidate_id": "P06_8"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1676.933,
+          -9208.916
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M06",
+        "municipality_name": "中央市 (Chuo City)",
+        "candidate_id": "P06_9"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          10082.459,
+          -6572.013
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          31826.631,
+          -13120.856
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21568.733,
+          401.443
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          33631.207,
+          -2445.38
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_4"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          27298.392,
+          -1500.947
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_5"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          34554.548,
+          -7934.639
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_6"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28328.014,
+          -7166.639
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_7"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          18351.618,
+          -20108.76
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_8"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14402.086,
+          -10434.353
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_9"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          22190.734,
+          -9343.809
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_10"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17909.115,
+          -2692.349
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_11"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          33010.604,
+          1948.006
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_12"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23034.711,
+          -4431.724
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M07",
+        "municipality_name": "東南村 (Tonan Village)",
+        "candidate_id": "P07_13"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          43181.68,
+          -471.255
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_1"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23463.423,
+          11067.451
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_2"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          33807.98,
+          9234.346
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_3"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          37255.632,
+          20362.085
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_4"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          31494.925,
+          16272.41
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_5"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          25749.839,
+          18159.306
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_6"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28473.131,
+          21746.071
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_7"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21114.747,
+          20769.701
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_8"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32795.801,
+          25496.753
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_9"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23930.306,
+          28581.423
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_10"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          25118.977,
+          25176.643
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_11"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          27690.015,
+          26679.307
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_12"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          27345.044,
+          38065.141
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "municipality_id": "M08",
+        "municipality_name": "北東町 (Hokuto Town)",
+        "candidate_id": "P08_13"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          43485.55,
+          4500.132
+        ]
+      }
+    }
+  ]
+}
