@@ -10,6 +10,9 @@
 | `milp_classical.py` | 同上 | MILP (`scipy.optimize.milp` / HiGHS)、QUBO なし |
 | `qubo_geo.py` | 新緑県データ + 充電ステーションつき | QUBO + シミュレーテッドアニーリング |
 | `milp_geo.py` | 同上 | MILP (HiGHS)、QUBO なし |
+| `rolling_grid.py` | グリッド版 | **ローリングホライズン**（単位時間ごとに再最適化）QUBO |
+| `rolling_geo.py` | 新緑県版 | **ローリングホライズン** QUBO（充電つき） |
+| `solver_backend.py` | 共通 | QUBO の解き方を切り替える窓口（`neal` / Fixstars Amplify AE） |
 | `common.py` | グリッド版のシナリオ・評価・動画 | |
 | `geo_common.py` | 新緑県版のシナリオ・評価・動画（充電モデル） | |
 | `results/*.json` | 各手法の実行結果 | |
@@ -18,11 +21,17 @@
 ## 実行方法
 
 ```bash
-pip install numpy scipy dimod dwave-neal
+pip install numpy scipy matplotlib dimod dwave-neal amplify
 python qubo_sa.py        # -> result_qubo.json, qubo_run.mp4
 python milp_classical.py # -> result_milp.json, classical_run.mp4
 python qubo_geo.py       # -> result_qubo_geo.json, qubo_geo.mp4
 python milp_geo.py       # -> result_milp_geo.json, classical_geo.mp4
+
+# ローリングホライズン版 (単位時間ごとに再最適化)
+python rolling_grid.py --unit 1 --horizon 2 --video rolling_grid.mp4
+python rolling_geo.py  --unit 2 --horizon 3 --video rolling_geo.mp4
+# Fixstars Amplify AE で解く場合 (トークンは https://amplify.fixstars.com で発行)
+AMPLIFY_TOKEN=xxxx python rolling_geo.py --backend amplify --time-limit-ms 1000
 ```
 
 > **注意:** 新緑県版（`*_geo.py`）は入力データ `data_transformed.json` が必要です。
@@ -71,3 +80,45 @@ QUBO + SA の J は最適値の約82%にとどまり、求解時間は MILP の�
 
 まずは MILP 版 (`milp_geo.py`) と同じシナリオで score を並べて比べるのがおすすめです。
 そのうえで、ペナルティ係数を alpha/beta 項の大きさに合わせて決め直すと改善が見込めます。
+
+## ローリングホライズン（単位時間ごとの再最適化）
+
+全ステップを1つの QUBO にすると、観測の重複を表す2次項が (機体数 × ステップ数)² に比例して増え、
+求解に時間がかかります。そこで次の手順を繰り返します。
+
+1. 状態（各機の位置・バッテリー残量・観測済みセル・市町村ごとの alpha/beta 累計）を持つ
+2. 先読み `--horizon` ステップぶんだけの小さな QUBO を作って解く
+3. そのうち先頭の `--unit` ステップ（単位時間）だけを確定して実行する
+4. 状態を更新して 2 に戻る
+
+窓ごとの QUBO の作り方は元の版と同じですが、次の点を変えています。
+
+- 観測済みのセルや、要求をすでに満たした市町村には報酬を付けない
+- alpha/beta は「残りの要求量」だけを目標にする
+- 新緑県版では、ペナルティ係数を alpha/beta の報酬も含めた最大値に合わせて決める
+
+各窓では、アニーラが返したサンプルを厳密な評価関数で採点し、いちばん良い実行可能解を選びます。
+制約違反のサンプルは修復してから候補に加えます。
+
+### 結果: グリッド版
+
+| 手法 | J | 観測率 | 時間 |
+|---|---|---|---|
+| MILP（最適） | 0.868 | 96.8% | 14 s |
+| QUBO 一括（`qubo_sa.py`） | 0.708 | 80.8% | 143 s |
+| **ローリング QUBO**（単位1, 先読み2） | **0.795** | **89.5%** | **8〜11 s** |
+
+### 結果: 新緑県版（※合成データでの動作確認）
+
+実データ `data_transformed.json` が手元にないため、同じ形式の合成データ
+（8市町村・72セル）で比べた参考値です。
+
+| 手法 | score | 時間 | 修復なしで制約OK |
+|---|---|---|---|
+| MILP（gap 0.06%） | 0.757 | 145 s | — |
+| QUBO 一括（`qubo_geo.py`） | 0.725 | 124 s | 0 / 30 |
+| **ローリング QUBO**（単位2, 先読み3, 20 reads × 1000 sweeps） | **0.736** | **12 s** | 5窓中2窓 |
+
+1窓あたりの2次項は約18万で、一括版の約134万より1桁少なくなっています。
+Fixstars Amplify AE 用のモデル変換は、係数が neal 版と完全に一致することを確認済みです。
+ただし、この開発環境からは Fixstars のサーバーに接続できないため、Amplify AE での求解自体は未実行です。

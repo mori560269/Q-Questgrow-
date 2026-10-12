@@ -1,0 +1,105 @@
+{
+ "method": "rolling QUBO (neal)",
+ "unit": 1,
+ "horizon": 2,
+ "J": 0.7952797843672106,
+ "covered_mass": 0.8952797843672106,
+ "hazard_steps": 1,
+ "feasible": true,
+ "total_sec": 7.911919116973877,
+ "solve_sec": 7.858659982681274,
+ "windows": [
+  {
+   "t0": 0,
+   "horizon": 2,
+   "unit": 1,
+   "n_vars": 600,
+   "n_quadratic": 82932,
+   "build_sec": 0.003168344497680664,
+   "solve_sec": 1.750891923904419,
+   "raw_feasible": 27,
+   "num_samples": 30
+  },
+  {
+   "t0": 1,
+   "horizon": 2,
+   "unit": 1,
+   "n_vars": 600,
+   "n_quadratic": 79377,
+   "build_sec": 0.0017268657684326172,
+   "solve_sec": 1.4540679454803467,
+   "raw_feasible": 30,
+   "num_samples": 30
+  },
+  {
+   "t0": 2,
+   "horizon": 2,
+   "unit": 1,
+   "n_vars": 600,
+   "n_quadratic": 75570,
+   "build_sec": 0.0017273426055908203,
+   "solve_sec": 1.3452448844909668,
+   "raw_feasible": 30,
+   "num_samples": 30
+  },
+  {
+   "t0": 3,
+   "horizon": 2,
+   "unit": 1,
+   "n_vars": 600,
+   "n_quadratic": 72366,
+   "build_sec": 0.0014851093292236328,
+   "solve_sec": 1.2510182857513428,
+   "raw_feasible": 30,
+   "num_samples": 30
+  },
+  {
+   "t0": 4,
+   "horizon": 2,
+   "unit": 1,
+   "n_vars": 600,
+   "n_quadratic": 67713,
+   "build_sec": 0.001491546630859375,
+   "solve_sec": 1.509272813796997,
+   "raw_feasible": 30,
+   "num_samples": 30
+  },
+  {
+   "t0": 5,
+   "horizon": 1,
+   "unit": 1,
+   "n_vars": 300,
+   "n_quadratic": 17130,
+   "build_sec": 0.001538991928100586,
+   "solve_sec": 0.5481641292572021,
+   "raw_feasible": 30,
+   "num_samples": 30
+  }
+ ],
+ "path": [
+  [
+   12,
+   13,
+   15,
+   37,
+   26,
+   17
+  ],
+  [
+   3,
+   25,
+   47,
+   65,
+   56,
+   78
+  ],
+  [
+   31,
+   52,
+   62,
+   84,
+   82,
+   60
+  ]
+ ]
+}
