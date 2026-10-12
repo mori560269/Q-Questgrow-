@@ -37,7 +37,10 @@ AMPLIFY_TOKEN=xxxx python rolling_geo_amplify.py --unit 2 --horizon 3 --time-lim
 python rolling_geo_amplify.py --backend neal
 ```
 
-Colab で動かす場合は `rolling_geo_amplify.ipynb` を開き、指示に従って5つのファイルをアップロードしてください。
+Colab で動かす場合は、次のリンクから開いて上から順に実行してください（コードとデータは `git clone` で自動取得します）。
+動画・窓ごとの記録・他の手法との比較表もノートブック内で表示されます。
+
+[Colab で開く](https://colab.research.google.com/github/mori560269/Q-Questgrow-/blob/claude/request-5v4fsc/rolling_geo_amplify.ipynb)
 データの場所は `GEO_DATA_PATH` で変えられます（既定では `data/` → カレントディレクトリの順に探します）。
 
 ## ローリングホライズン（単位時間ごとの再最適化）
