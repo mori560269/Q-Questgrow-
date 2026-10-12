@@ -5,24 +5,10 @@
  "launch_interval_sec": 900,
  "incidents": [
   {
-   "type": "hazard",
-   "label": "火災",
-   "x": -15172,
-   "y": 19453,
-   "radius_m": 500
-  },
-  {
    "type": "battery_fault",
    "time_sec": 1200,
    "drone": 5,
    "battery_ratio": 0.35
-  },
-  {
-   "type": "survivor",
-   "label": "要救助者A",
-   "x": -28439,
-   "y": -6022,
-   "observe_sec": 90
   },
   {
    "type": "drone_failure",
@@ -31,10 +17,24 @@
   },
   {
    "type": "hazard",
+   "label": "火災",
+   "x": -15543,
+   "y": 11813,
+   "radius_m": 500
+  },
+  {
+   "type": "hazard",
    "label": "土砂崩れ",
-   "x": 3624,
-   "y": -27138,
+   "x": -14185,
+   "y": -27595,
    "radius_m": 400
+  },
+  {
+   "type": "survivor",
+   "label": "要救助者A",
+   "x": 36090,
+   "y": -2371,
+   "observe_sec": 90
   }
  ]
 }

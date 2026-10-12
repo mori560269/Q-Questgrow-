@@ -87,3 +87,50 @@ def solve_qubo(n, lin, rows, cols, vals, offset=0.0, backend="neal",
     else:
         raise ValueError(f"unknown backend: {backend}")
     return samples, energies, time.time() - t0, len(v)
+
+
+def polish_onehot(n, lin, rows, cols, vals, slot, sample, passes=5):
+    """one-hot のグループ (slot が同じ変数の組) ごとに1つ選ぶ解を, 局所探索で磨く.
+
+    アニーリングの解を出発点に, 「1つのグループの選択だけを変えて QUBO のエネルギーが
+    下がるなら変える」を繰り返す. one-hot は常に満たした状態で探索する.
+    戻り値: {slot の値: 選んだ変数の番号}"""
+    slot = np.asarray(slot)
+    r = np.concatenate([np.asarray(x, int) for x in rows]) if rows else np.zeros(0, int)
+    c = np.concatenate([np.asarray(x, int) for x in cols]) if cols else np.zeros(0, int)
+    v = np.concatenate([np.asarray(x, float) for x in vals]) if vals else np.zeros(0)
+    keep = (r < n) & (c < n)
+    r, c, v = r[keep], c[keep], v[keep]
+    keep = slot[r] != slot[c]                          # one-hot の項は除く (構造で満たす)
+    Q = sp.coo_matrix((v[keep], (r[keep], c[keep])), shape=(n, n)).tocsr()
+    Q = (Q + Q.T).tocsr()
+    groups = {s_: np.where(slot == s_)[0] for s_ in np.unique(slot)}
+    sel = {}
+    for s_, ks in groups.items():
+        on = ks[np.asarray(sample)[ks] == 1]
+        sel[s_] = int(on[0]) if len(on) == 1 else int(ks[np.argmin(np.asarray(lin)[ks])])
+    x = np.zeros(n)
+    x[list(sel.values())] = 1
+    field = np.asarray(lin, float) + Q @ x
+    for _ in range(passes):
+        changed = False
+        for s_, ks in groups.items():
+            cur = sel[s_]
+            f = field[ks] - Q[ks, cur].toarray().ravel()   # 自分のグループの寄与を除く
+            j = int(np.argmin(f))
+            if ks[j] != cur and f[j] < field[cur] - 1e-15:
+                field += Q[:, ks[j]].toarray().ravel() - Q[:, cur].toarray().ravel()
+                sel[s_] = int(ks[j])
+                changed = True
+        if not changed:
+            break
+    return sel
+
+
+def qubo_energy(x, lin, rows, cols, vals, offset=0.0):
+    """0/1 ベクトル x の QUBO エネルギー"""
+    x = np.asarray(x, float)
+    r = np.concatenate([np.asarray(a, int) for a in rows]) if rows else np.zeros(0, int)
+    c = np.concatenate([np.asarray(a, int) for a in cols]) if cols else np.zeros(0, int)
+    v = np.concatenate([np.asarray(a, float) for a in vals]) if vals else np.zeros(0)
+    return float(offset + np.asarray(lin) @ x + (v * x[r] * x[c]).sum())

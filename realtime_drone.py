@@ -37,7 +37,8 @@ import numpy as np
 import scipy.sparse as sp
 
 from realtime_world import World, deep_update, load_inputs, score_parts
-from solver_backend import solve_qubo
+from deploy import candidate_points, deploy
+from solver_backend import solve_qubo, polish_onehot
 
 
 # ------------------------------------------------------------------ 機体
@@ -54,8 +55,12 @@ class Drone:
         self.battery = self.cap
         self.pos = np.array(start, float)
         self.target = self.pos.copy()
-        self.mode = "fly"          # standby / fly / return / charge / failed
+        self.mode = "fly"          # standby / fly / transit / return / charge / failed
         self.step = self.speed * sc["plan_step_sec"]
+        self.base = self.pos.copy()     # 基地 (発着・充電地点)
+        self.base_pt = None             # 基地にしている候補地点の番号
+        self.region = None              # 担当する市町村 (None なら どこでも飛ぶ)
+        self.next_pt = None             # 配置換えで次に移る候補地点 (移動前)
 
 
 def point_seg_dist(c, p0, p1):
@@ -92,8 +97,8 @@ def build_qubo(world, drones, state, sc):
                 for j in range(-R, R + 1):
                     p = d.pos + d.step * np.array([i, j], float)
                     m = world.muni_at(p)
-                    if m < 0:
-                        continue
+                    if m < 0 or (d.region is not None and m != d.region):
+                        continue                       # 担当の市町村の外には出ない
                     # 親 (1つ前のステップの格子点) から掃く
                     pi, pj = (0, 0) if h == 0 else (int(np.clip(i, -h, h)), int(np.clip(j, -h, h)))
                     p0 = d.pos + d.step * np.array([pi, pj], float)
@@ -102,7 +107,7 @@ def build_qubo(world, drones, state, sc):
                         continue
                     # 戻れなくなる地点は除く
                     left = d.battery - d.drain * R * sc["plan_step_sec"]
-                    _, dist = world.nearest_station(p)
+                    dist = float(np.hypot(*(p - d.base)))
                     if left < d.drain * dist / d.speed * margin:
                         continue
                     sw = world.swath(p0, p, d.r)
@@ -140,7 +145,9 @@ def build_qubo(world, drones, state, sc):
         zc = np.array([z["x"], z["y"]])
         if any(np.hypot(*(d.pos - zc)) <= d.r for d in drones):
             continue
-        dn = min(drones, key=lambda d: np.hypot(*(d.pos - zc)))
+        zm = world.muni_at(zc)
+        pool = [d for d in drones if d.region == zm] or drones      # その市町村の担当機から
+        dn = min(pool, key=lambda d: np.hypot(*(d.pos - zc)))
         goto.setdefault(dn.i, []).append(zc)
     for k, c in enumerate(cand):
         if c["tgt"]:
@@ -222,45 +229,11 @@ def build_qubo(world, drones, state, sc):
     return n, lin, rows, cols, vals, offset, cand
 
 
-def choose_targets(sample, cand, lin, rows, cols, vals, drones, passes=5):
-    """解から各機の次の目的地 (h=0) を決める.
-
-    アニーリングの解を出発点に, 「1つの (機体, ステップ) の選択だけを変えて QUBO の
-    エネルギーが下がるなら変える」局所探索で磨く (one-hot は常に満たした状態で探索)"""
-    n = len(cand)
+def choose_targets(sample, cand, lin, rows, cols, vals, drones):
+    """解から各機の次の目的地 (h=0) を決める (one-hot を保った局所探索で磨いてから)"""
     slot = np.array([c["d"] * 100 + c["h"] for c in cand])
-    r = np.concatenate([np.asarray(x, int) for x in rows]) if rows else np.zeros(0, int)
-    c_ = np.concatenate([np.asarray(x, int) for x in cols]) if cols else np.zeros(0, int)
-    v = np.concatenate([np.asarray(x, float) for x in vals]) if vals else np.zeros(0)
-    keep = slot[r] != slot[c_]                         # one-hot の項は除く (構造で満たす)
-    Q = sp.coo_matrix((v[keep], (r[keep], c_[keep])), shape=(n, n)).tocsr()
-    Q = (Q + Q.T).tocsr()
-    groups = {s_: np.where(slot == s_)[0] for s_ in np.unique(slot)}
-    sel = {}
-    for s_, ks in groups.items():
-        on = ks[sample[ks] == 1]
-        sel[s_] = int(on[0]) if len(on) == 1 else int(ks[np.argmin(lin[ks])])
-    x = np.zeros(n)
-    x[list(sel.values())] = 1
-    field = lin + Q @ x
-    for _ in range(passes):
-        changed = False
-        for s_, ks in groups.items():
-            cur = sel[s_]
-            f = field[ks] - Q[ks, cur].toarray().ravel()   # 自分の slot の寄与を除く
-            best = int(ks[np.argmin(f)])
-            if best != cur and f[np.argmin(f)] < field[cur] - Q[cur, cur] - 1e-15:
-                field += Q[:, best].toarray().ravel() - Q[:, cur].toarray().ravel()
-                sel[s_] = best
-                changed = True
-        if not changed:
-            break
-    out = {}
-    for d in drones:
-        k = sel.get(d.i * 100 + 0)
-        if k is not None:
-            out[d.i] = cand[k]["pos"]
-    return out
+    sel = polish_onehot(len(cand), lin, rows, cols, vals, slot, sample)
+    return {d.i: cand[sel[d.i * 100]]["pos"] for d in drones if d.i * 100 in sel}
 
 
 # ------------------------------------------------------------------ シミュレーション
@@ -285,6 +258,46 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
         if d.launch_t > 0:
             d.mode = "standby"
 
+    margin = sc["battery"]["reserve_margin"]
+    dep = sc["deployment"]
+    pts = reg = None
+    deployments = []
+
+    def try_transit(d):
+        """配置換えが決まっていて, 新しい基地まで電池が持つなら移動を始める"""
+        if d.next_pt is None:
+            return False
+        dist = float(np.hypot(*(pts[d.next_pt] - d.pos)))
+        if d.battery >= d.drain * dist / d.speed * margin + d.drain:
+            d.mode = "transit"
+            return True
+        return False
+
+    def apply_deploy(t, trigger, moving_cost):
+        active = [d for d in drones if d.mode != "failed"]
+        assign, info = deploy(world, active, pts, reg, state, sc, token=token,
+                              moving_cost=moving_cost, seed=int(so["seed"] + t))
+        moved = []
+        for d in active:
+            p = int(assign[d.i])
+            if d.base_pt is None:                      # 初期配置: 基地から出発
+                d.base_pt, d.base, d.region = p, pts[p].copy(), int(reg[p])
+                d.pos, d.target = pts[p].copy(), pts[p].copy()
+            elif p == d.base_pt and d.next_pt is not None:    # 配置換えの取り消し
+                d.next_pt, d.region = None, int(reg[p])
+                if d.mode == "transit":
+                    d.mode = "fly"
+            elif p != d.base_pt and p != d.next_pt:
+                moved.append((d.i, int(d.region), int(reg[p])))
+                d.next_pt, d.region = p, int(reg[p])
+                if d.mode == "fly" and not try_transit(d):
+                    d.mode = "return"                  # 電池が足りなければ 一度戻って充電してから
+        counts = np.bincount([d.region for d in active], minlength=world.M).tolist()
+        deployments.append(dict(t=t, trigger=trigger, counts=counts, moved=moved,
+                                assign={d.i: int(d.next_pt if d.next_pt is not None else d.base_pt)
+                                        for d in active}, **info))
+        return moved, counts
+
     state = dict(covered=np.zeros(world.nx * world.ny, bool),
                  first_seen=np.full(world.nx * world.ny, np.inf, np.float32),
                  A=np.zeros(world.M), B=np.zeros(world.M), incidents=[])
@@ -295,6 +308,18 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
         state["incidents"].append(z)
 
     events, replans, track = [], [], []
+    if dep.get("enabled", True):
+        pts, reg = candidate_points(world, data, int(dep.get("auto_candidates", 10)))
+        _, counts = apply_deploy(0.0, "initial", moving_cost=False)
+        events.append(dict(t=0.0, kind="deploy", msg="初期配置: " + " ".join(
+            f"{world.names[m].split(' (')[0]}{c}機" for m, c in enumerate(counts))))
+        if verbose:
+            print("[t=     0s] 初期配置 (配置 QUBO):", events[-1]["msg"], flush=True)
+    else:
+        pts, reg = world.stations, np.full(len(world.stations), -1)
+        for d in drones:
+            d.base_pt = d.i % len(pts)
+    last_deploy = 0.0
     carry = []                         # 前の秒の移動中に起きたトラブル (電池切れ) → 次の秒に組み直す
     last_plan = -1e9
     t = 0.0
@@ -318,7 +343,7 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
             elif z["status"] == "hidden" and t >= z.get("appear_sec", 0):
                 c = np.array([z["x"], z["y"]])
                 for d in drones:
-                    if d.mode in ("fly", "return") and np.hypot(*(d.pos - c)) <= z["radius_m"] + d.r:
+                    if d.mode in ("fly", "transit", "return") and np.hypot(*(d.pos - c)) <= z["radius_m"] + d.r:
                         z["status"] = "found"; z["found_t"] = t; z["found_by"] = d.i
                         label = z.get("label", z["type"])
                         new_events.append(dict(t=t, kind=f"found_{z['type']}", drone=d.i, incident=z["id"],
@@ -336,6 +361,21 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
         if verbose:
             for e in new_events:
                 print(f"[t={t:6.0f}s] ⚠ {e['msg']} → QUBO を組み直します", flush=True)
+
+        # ---- 1.5) 配置の見直し (定期 / 機体が減ったときは即時)
+        lost = [e for e in new_events if e["kind"] in ("drone_failure", "battery_empty")]
+        if dep.get("enabled", True) and t > 0 and (lost or t - last_deploy >= dep["redeploy_sec"] - 1e-9):
+            why = "機体の離脱" if lost else "定期"
+            moved, counts = apply_deploy(t, "event" if lost else "periodic", moving_cost=True)
+            last_deploy = t
+            msg = f"配置を見直し ({why}): " + (", ".join(
+                f"機体{i + 1} {world.names[a].split(' (')[0]}→{world.names[b].split(' (')[0]}"
+                for i, a, b in moved[:3]) + (" ほか" if len(moved) > 3 else "") if moved else "変更なし")
+            e = dict(t=t, kind="redeploy", msg=msg)
+            events.append(e)
+            new_events.append(e)
+            if verbose:
+                print(f"[t={t:6.0f}s] 配置 QUBO: {msg}", flush=True)
 
         # ---- 2) 最適化 (定期 / トラブル発生時は即時)
         flying = [d for d in drones if d.mode == "fly"]
@@ -370,20 +410,21 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
             if d.mode == "failed":
                 continue
             if d.mode == "standby":
-                if t + dt >= d.launch_t:
+                if t + dt >= d.launch_t and not try_transit(d):
                     d.mode = "fly"; d.target = d.pos.copy()
                 continue
             if d.mode == "charge":
                 d.battery = min(d.cap, d.battery + d.cap / sc["battery"]["full_charge_sec"] * dt)
-                if d.battery >= sc["battery"]["resume_ratio"] * d.cap:
+                if d.battery >= sc["battery"]["resume_ratio"] * d.cap and not try_transit(d):
                     d.mode = "fly"; d.target = d.pos.copy()
                 continue
-            k, dist = world.nearest_station(d.pos)
+            dist = float(np.hypot(*(d.base - d.pos)))
             if d.mode == "fly":
-                need = d.drain * (dist / d.speed * sc["battery"]["reserve_margin"] + dt)
+                need = d.drain * (dist / d.speed * margin + dt)
                 if d.battery - d.drain * dt < need:
                     d.mode = "return"
-            goal = world.stations[k] if d.mode == "return" else d.target
+            goal = {"return": d.base, "transit": pts[d.next_pt] if d.next_pt is not None else d.base
+                    }.get(d.mode, d.target)
             v = goal - d.pos
             L = float(np.hypot(*v))
             step = min(L, d.speed * dt)
@@ -400,6 +441,9 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
             d.battery -= d.drain * dt
             if d.mode == "return" and L <= d.speed * dt + 1e-6:
                 d.mode = "charge"
+            elif d.mode == "transit" and L <= d.speed * dt + 1e-6:   # 新しい基地に着いた
+                d.base_pt, d.base, d.next_pt = d.next_pt, pts[d.next_pt].copy(), None
+                d.mode, d.target = "fly", d.pos.copy()
             if d.battery < 0:
                 d.mode = "failed"
                 carry.append(dict(t=t, kind="battery_empty", drone=d.i,
@@ -410,11 +454,14 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
         track.append(dict(t=t, score=sc_now, met=met,
                           pos=[[round(float(d.pos[0]), 1), round(float(d.pos[1]), 1)] for d in drones],
                           bat=[round(d.battery / d.cap, 3) for d in drones],
-                          mode=[d.mode for d in drones]))
+                          mode=[d.mode for d in drones],
+                          base=[int(d.base_pt) if d.base_pt is not None else -1 for d in drones],
+                          region=[-1 if d.region is None else int(d.region) for d in drones]))
         if verbose and int(t) % 300 == 0:
             print(f"[t={t:6.0f}s] score={sc_now:.3f} 要求達成 {met}/{3 * world.M} "
                   f"飛行 {sum(d.mode == 'fly' for d in drones)} / 帰還 {sum(d.mode == 'return' for d in drones)} / "
                   f"充電 {sum(d.mode == 'charge' for d in drones)} / 待機 {sum(d.mode == 'standby' for d in drones)} / "
+                  f"移動 {sum(d.mode == 'transit' for d in drones)} / "
                   f"故障 {sum(d.mode == 'failed' for d in drones)}",
                   flush=True)
         if realtime:
@@ -436,6 +483,8 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
                build_ms_mean=float(np.mean([r["build_ms"] for r in replans])) if replans else 0.0,
                wall_sec=time.time() - wall0, replans=replans, track=track,
                stations=world.stations.tolist(),
+               points=np.asarray(pts).tolist(), point_region=np.asarray(reg).tolist(),
+               deployments=deployments,
                drones=[dict(id=d.i, sensor=d.sensor, r=d.r, speed=d.speed) for d in drones])
     if verbose:
         print(f"[結果] score={score:.3f} 要求達成 {met}/{3 * world.M} / 最適化 {len(replans)} 回 "

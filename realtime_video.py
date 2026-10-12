@@ -24,7 +24,8 @@ plt.rcParams["axes.unicode_minus"] = False
 SENSOR_COLOR = {"SENS-ALPHA-01": "#d62728", "SENS-BETA-02": "#1f77b4", "SENS-GAMMA-03": "#2ca02c"}
 SENSOR_NAME = {"SENS-ALPHA-01": "ALPHA", "SENS-BETA-02": "BETA", "SENS-GAMMA-03": "GAMMA"}
 MUNI_COLORS = ["#f4e9d8", "#e8f0e0", "#e6eaf4", "#f4e4ea", "#efeadb", "#e2f0ef", "#f1ebf5", "#eef2dc"]
-MODE_JP = {"fly": "飛行", "return": "帰還", "charge": "充電", "failed": "故障", "standby": "待機"}
+MODE_JP = {"fly": "飛行", "return": "帰還", "charge": "充電", "failed": "故障", "standby": "待機",
+           "transit": "移動"}
 
 
 def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0):
@@ -47,6 +48,10 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
     green = np.array(matplotlib.colors.to_rgb("#3fae5a"))
     seen = state["first_seen"]
     inc = {z["id"]: z for z in res["incidents"]}
+    pts = np.asarray(res.get("points") or world.stations) / km
+    cent = [poly.mean(0) / km for poly in world.polys]
+    short = [n.split(" (")[0] for n in world.names]
+    n_redeploy = sum(1 for e in res["events"] if e["kind"] == "redeploy")
 
     def focus(t):
         """拡大図の中心: 直近のトラブル地点 (なければ最初のステーション)"""
@@ -72,7 +77,7 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
              " ".join(f"{SENSOR_NAME.get(f['sensor'], f['sensor'])} {f['sensor_radius_m']:.0f}m×{f['count']}"
                       for f in sc["fleet"]) +
              f" / 電池 {sc['battery']['capacity_sec'] / 60:.0f}分飛行・満充電 {sc['battery']['full_charge_sec'] / 60:.0f}分"
-             f" / {sc.get('launch_waves', 1)}組で交代出発"
+             f" / {sc.get('launch_waves', 1)}組で交代出発 / 配置 QUBO 見直し {n_redeploy}回"
              f" / 最適化 {res['replans_total']}回 (トラブル起因 {res['replans_by_event']}回)",
              fontsize=9, color="#444")
 
@@ -82,8 +87,17 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
             a.add_patch(MplPolygon(poly / km, closed=True, fill=False, ec="#666", lw=0.8))
         if world.pref is not None:
             a.plot(world.pref[:, 0] / km, world.pref[:, 1] / km, "-", color="k", lw=1.4)
-        st = world.stations / km
-        a.plot(st[:, 0], st[:, 1], "^", ms=12 if detail else 9, color="#f1c40f", mec="k", zorder=4)
+        # 候補地点 (灰) と 基地 (黄三角 = 配置 QUBO で選ばれた地点)
+        a.plot(pts[:, 0], pts[:, 1], ".", ms=4 if detail else 2.5, color="#999", zorder=3)
+        bases = sorted({b for b in track[k]["base"] if b >= 0})
+        a.plot(pts[bases, 0], pts[bases, 1], "^", ms=12 if detail else 8, color="#f1c40f", mec="k", zorder=4)
+        if not detail:                                   # 市町村ごとの担当機数
+            regs = [g for g, md in zip(track[k]["region"], track[k]["mode"]) if g >= 0 and md != "failed"]
+            cnt = np.bincount(regs, minlength=world.M) if regs else np.zeros(world.M, int)
+            for m in range(world.M):
+                a.text(cent[m][0], cent[m][1], f"{short[m]}\n{cnt[m]}機", fontsize=7.5, ha="center",
+                       va="center", color="#333", zorder=6,
+                       bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.6))
         for z in res["incidents"]:
             found = z.get("found_t") is not None and z["found_t"] <= t
             if z["type"] == "hazard":
@@ -116,8 +130,11 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
             if detail and modes[d] in ("fly", "return"):
                 a.add_patch(Circle((x, y), drones[d]["r"] / km, fc=matplotlib.colors.to_rgba(col, 0.12),
                                    ec=col, lw=1.0, zorder=5))
-            a.plot(x, y, "o", ms=7 if detail else 5, color=col if modes[d] == "fly" else "white", mec=col,
-                   mew=1.5, zorder=8)
+            if modes[d] == "transit":                       # 配置換えで移動中
+                a.plot(x, y, "D", ms=7 if detail else 5, color=col, mec="k", mew=1.2, zorder=8)
+            else:
+                a.plot(x, y, "o", ms=7 if detail else 5, color=col if modes[d] == "fly" else "white",
+                       mec=col, mew=1.5, zorder=8)
             if detail:
                 a.text(x + 0.15, y + 0.15, str(d + 1), fontsize=7, zorder=9)
 
@@ -129,16 +146,16 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
         img = base.copy()
         img[seen <= t] = green
         img = img.reshape(world.ny, world.nx, 3)
-        # 全体図
-        draw_map(ax, k, t, img, detail=False)
+        # 全体図 (描画を軽くするため 2 マスおきに間引く)
+        draw_map(ax, k, t, img[::2, ::2], detail=False)
         c, why = focus(t)
         h = zoom_km / 2
         ax.add_patch(plt.Rectangle((c[0] - h, c[1] - h), zoom_km, zoom_km, fill=False, ec="#8e44ad", lw=1.5,
                                    zorder=9))
         ax.set_xlim(ext[0], ext[1]); ax.set_ylim(ext[2], ext[3]); ax.set_aspect("equal")
         ax.tick_params(labelsize=7)
-        ax.set_title(f"全体図  t = {int(t) // 60:02d}:{int(t) % 60:02d}   ● 飛行  ○ 帰還/充電/待機  × 故障",
-                     fontsize=9)
+        ax.set_title(f"全体図  t = {int(t) // 60:02d}:{int(t) % 60:02d}   ● 飛行  ◆ 配置換えで移動  "
+                     f"○ 帰還/充電/待機  × 故障  ▲ 基地", fontsize=9)
         # 拡大図
         draw_map(axz, k, t, img, detail=True)
         axz.set_xlim(c[0] - h, c[0] + h); axz.set_ylim(c[1] - h, c[1] + h); axz.set_aspect("equal")
@@ -149,13 +166,14 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
         # 記録
         evs = [e for e in res["events"] if e["t"] <= t][-7:]
         axe.axis("off")
-        axe.text(0, 1.0, "トラブルと QUBO の組み直し", fontsize=10, transform=axe.transAxes, va="top",
-                 fontweight="bold")
+        axe.text(0, 1.0, "トラブル・配置の見直しと QUBO の組み直し", fontsize=10, transform=axe.transAxes,
+                 va="top", fontweight="bold")
         for i, e in enumerate(evs):
             red = "found" in e["kind"] or e["kind"] in ("drone_failure", "battery_fault", "battery_empty")
+            dep = e["kind"] in ("deploy", "redeploy")
             axe.text(0.0, 0.82 - i * 0.13, f"{int(e['t']) // 60:02d}:{int(e['t']) % 60:02d}  {e['msg']}"
-                     "  → QUBO 組み直し", fontsize=8.5, transform=axe.transAxes,
-                     color="#a00" if red else "#2c7a3f", va="top")
+                     + ("" if dep else "  → QUBO 組み直し"), fontsize=8, transform=axe.transAxes,
+                     color="#a00" if red else ("#1f5fa8" if dep else "#2c7a3f"), va="top")
         if not evs:
             axe.text(0.0, 0.8, "(まだトラブルなし. 毎秒の定期最適化のみ)", fontsize=9, color="#777",
                      transform=axe.transAxes, va="top")

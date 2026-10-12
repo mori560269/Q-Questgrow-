@@ -41,6 +41,12 @@ DEFAULT_SCENARIO = {
     "launch_waves": 1,          # 交代運用: 何組に分けて出発するか (1 = 全機同時)
     "launch_interval_sec": 900, # 組ごとの出発のずれ [s]
     "alpha_beta_per_sec": 60,   # 稼働 60 秒ごとに alpha/beta を1回分加算
+    # 配置: 各市町村 (領域) に複数機を置き, 基地 (発着・充電地点) を候補地点から選ぶ
+    "deployment": {"enabled": True,
+                   "min_per_region": 2,       # 1つの市町村に置く最少機数
+                   "redeploy_sec": 900,       # 配置を見直す間隔 [s] (故障・電池切れ時は即時)
+                   "spread_m": 6000,          # 同じ市町村の基地どうしをこれより離したい
+                   "auto_candidates": 10},    # 候補地点がデータに無い市町村は自動で作る数
     "incidents": [],            # トラブル (data/scenario_example.json 参照)
     "solver": {"backend": "neal", "num_reads": 4, "num_sweeps": 200, "time_limit_ms": 500,
                "lam_ov": 0.5, "pen": 3.0, "target_factor": 5.0, "inertia": 0.5, "seed": 0},
@@ -138,6 +144,10 @@ class World:
         if 0 <= i < self.ny and 0 <= j < self.nx:
             return i * self.nx + j
         return -1
+
+    def cell_xy(self, flat):
+        i, j = np.divmod(np.asarray(flat), self.nx)
+        return np.c_[self.x0 + (j + 0.5) * self.res, self.y0 + (i + 0.5) * self.res]
 
     def muni_at(self, p):
         c = self.cell_of(p)
