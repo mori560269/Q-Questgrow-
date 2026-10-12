@@ -1,0 +1,39 @@
+{
+ "method": "QUBO + simulated annealing (neal)",
+ "J": 0.7083748137885894,
+ "covered_mass": 0.8083748137885893,
+ "hazard_steps": 1,
+ "feasible": true,
+ "n_vars": 1800,
+ "n_quadratic": 506268,
+ "build_sec": 1.0907995700836182,
+ "solve_sec": 143.2027587890625,
+ "feasible_samples": 92,
+ "num_reads": 100,
+ "path": [
+  [
+   20,
+   12,
+   23,
+   45,
+   65,
+   77
+  ],
+  [
+   23,
+   24,
+   34,
+   26,
+   37,
+   15
+  ],
+  [
+   21,
+   42,
+   64,
+   72,
+   83,
+   81
+  ]
+ ]
+}

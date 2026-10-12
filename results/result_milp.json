@@ -1,0 +1,38 @@
+{
+ "method": "MILP (scipy.optimize.milp / HiGHS)",
+ "J": 0.8682797412330792,
+ "covered_mass": 0.9682797412330791,
+ "hazard_steps": 1,
+ "feasible": true,
+ "n_vars": 1900,
+ "n_constraints": 2218,
+ "solve_sec": 14.140512228012085,
+ "mip_gap": 1.674487113611954e-06,
+ "status": 0,
+ "path": [
+  [
+   2,
+   24,
+   36,
+   58,
+   39,
+   18
+  ],
+  [
+   23,
+   5,
+   23,
+   41,
+   60,
+   81
+  ],
+  [
+   32,
+   54,
+   73,
+   84,
+   65,
+   87
+  ]
+ ]
+}

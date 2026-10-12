@@ -10,7 +10,10 @@
 | `milp_classical.py` | 同上 | MILP (`scipy.optimize.milp` / HiGHS)、QUBO なし |
 | `qubo_geo.py` | 新緑県データ + 充電ステーションつき | QUBO + シミュレーテッドアニーリング |
 | `milp_geo.py` | 同上 | MILP (HiGHS)、QUBO なし |
-| `results/result_qubo_geo.json` | `qubo_geo.py` の実行結果 | |
+| `common.py` | グリッド版のシナリオ・評価・動画 | |
+| `geo_common.py` | 新緑県版のシナリオ・評価・動画（充電モデル） | |
+| `results/*.json` | 各手法の実行結果 | |
+| `videos/*.mp4` | 解の動画 | |
 
 ## 実行方法
 
@@ -22,9 +25,9 @@ python qubo_geo.py       # -> result_qubo_geo.json, qubo_geo.mp4
 python milp_geo.py       # -> result_milp_geo.json, classical_geo.mp4
 ```
 
-> **注意:** 各スクリプトが読み込む `common.py`（グリッド版）と `geo_common.py`（新緑県版）は
-> まだリポジトリに入っていないため、このままでは実行できません。シナリオ生成・評価・動画出力は
-> これら2つのファイルに入っています。
+> **注意:** 新緑県版（`*_geo.py`）は入力データ `data_transformed.json` が必要です。
+> まだリポジトリに入っていないので、`data/data_transformed.json` に置くか、
+> 環境変数 `GEO_DATA_PATH` でパスを指定してください。
 
 ## 2つの解き方の違い
 
@@ -37,6 +40,16 @@ python milp_geo.py       # -> result_milp_geo.json, classical_geo.mp4
   - 制約も不等式のまま扱えます。
 
 どちらの解も、最終的には共通の評価関数（厳密な和集合・キャップつき）で採点します。
+
+## 結果: グリッド版（10×10, 3機, 6ステップ）
+
+| 手法 | J | 観測率 | 危険滞在 | 求解時間 | 備考 |
+|---|---|---|---|---|---|
+| MILP (`milp_classical.py`) | **0.868** | **96.8%** | 1 | 14 s | 最適 (gap ≈ 2e-6) |
+| QUBO + SA (`qubo_sa.py`) | 0.708 | 80.8% | 1 | 143 s | 100 reads × 8000 sweeps、92/100 が実行可能 |
+
+QUBO + SA の J は最適値の約82%にとどまり、求解時間は MILP の約10倍です。
+差の主な原因は、和集合を2次で近似していること（`λ_ov = 0.3`）だと考えられます。
 
 ## 結果: `qubo_geo.py`（新緑県・充電つき）
 
