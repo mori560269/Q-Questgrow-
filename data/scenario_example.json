@@ -1,8 +1,13 @@
 {
  "_説明": "realtime_drone.py のシナリオ例. 書かなかった項目は realtime_world.DEFAULT_SCENARIO の値になる. 座標は入力データと同じ m 単位, 機体番号は 1 始まり",
- "duration_sec": 3600,
+ "duration_sec": 21600,
  "launch_waves": 3,
  "launch_interval_sec": 900,
+ "video_every_sec": 60,
+ "patrol": {
+  "block_m": 3000,
+  "revisit_sec": 3600
+ },
  "incidents": [
   {
    "type": "battery_fault",
@@ -12,28 +17,35 @@
   },
   {
    "type": "drone_failure",
-   "time_sec": 2100,
+   "time_sec": 7200,
    "drone": 12
   },
   {
    "type": "hazard",
    "label": "火災",
-   "x": -15543,
-   "y": 11813,
+   "x": 14151,
+   "y": 1434,
    "radius_m": 500
   },
   {
    "type": "hazard",
    "label": "土砂崩れ",
-   "x": -14185,
-   "y": -27595,
+   "x": 11825,
+   "y": 45688,
    "radius_m": 400
   },
   {
    "type": "survivor",
    "label": "要救助者A",
-   "x": 36090,
-   "y": -2371,
+   "x": -24570,
+   "y": -3774,
+   "observe_sec": 90
+  },
+  {
+   "type": "survivor",
+   "label": "要救助者B",
+   "x": 10689,
+   "y": -24594,
    "observe_sec": 90
   }
  ]

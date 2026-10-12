@@ -33,12 +33,13 @@ def merge_quadratic(n, rows, cols, vals):
     return Q.row[keep], Q.col[keep], Q.data[keep]
 
 
-def _solve_neal(n, lin, r, c, v, offset, num_reads, num_sweeps, seed):
+def _solve_neal(n, lin, r, c, v, offset, num_reads, num_sweeps, seed, beta_range=None):
     import dimod
     import neal
     bqm = dimod.BinaryQuadraticModel.from_numpy_vectors(lin, (r, c, v), offset, "BINARY")
+    kw = {} if beta_range is None else dict(beta_range=list(beta_range))
     ss = neal.SimulatedAnnealingSampler().sample(bqm, num_reads=num_reads,
-                                                 num_sweeps=num_sweeps, seed=seed)
+                                                 num_sweeps=num_sweeps, seed=seed, **kw)
     var_index = {x: i for i, x in enumerate(ss.variables)}
     perm = np.array([var_index[x] for x in range(n)])
     order = np.argsort(ss.record.energy)
@@ -77,11 +78,12 @@ def _solve_amplify(n, lin, r, c, v, offset, token, time_limit_ms):
 
 def solve_qubo(n, lin, rows, cols, vals, offset=0.0, backend="neal",
                num_reads=30, num_sweeps=2000, seed=0,
-               token=None, time_limit_ms=1000):
+               token=None, time_limit_ms=1000, beta_range=None):
     r, c, v = merge_quadratic(n, rows, cols, vals)
     t0 = time.time()
     if backend == "neal":
-        samples, energies = _solve_neal(n, lin, r, c, v, offset, num_reads, num_sweeps, seed)
+        samples, energies = _solve_neal(n, lin, r, c, v, offset, num_reads, num_sweeps, seed,
+                                        beta_range)
     elif backend == "amplify":
         samples, energies = _solve_amplify(n, lin, r, c, v, offset, token, time_limit_ms)
     else:
@@ -104,6 +106,9 @@ def polish_onehot(n, lin, rows, cols, vals, slot, sample, passes=5):
     keep = slot[r] != slot[c]                          # one-hot の項は除く (構造で満たす)
     Q = sp.coo_matrix((v[keep], (r[keep], c[keep])), shape=(n, n)).tocsr()
     Q = (Q + Q.T).tocsr()
+    if n <= 4000:                                      # 小さければ密行列の方が速い
+        Q = Q.toarray()
+    dense = isinstance(Q, np.ndarray)
     groups = {s_: np.where(slot == s_)[0] for s_ in np.unique(slot)}
     sel = {}
     for s_, ks in groups.items():
@@ -116,10 +121,14 @@ def polish_onehot(n, lin, rows, cols, vals, slot, sample, passes=5):
         changed = False
         for s_, ks in groups.items():
             cur = sel[s_]
-            f = field[ks] - Q[ks, cur].toarray().ravel()   # 自分のグループの寄与を除く
+            qc = Q[ks, cur] if dense else Q[ks, cur].toarray().ravel()
+            f = field[ks] - qc                                 # 自分のグループの寄与を除く
             j = int(np.argmin(f))
             if ks[j] != cur and f[j] < field[cur] - 1e-15:
-                field += Q[:, ks[j]].toarray().ravel() - Q[:, cur].toarray().ravel()
+                if dense:
+                    field += Q[:, ks[j]] - Q[:, cur]
+                else:
+                    field += Q[:, ks[j]].toarray().ravel() - Q[:, cur].toarray().ravel()
                 sel[s_] = int(ks[j])
                 changed = True
         if not changed:

@@ -36,7 +36,8 @@ import time
 import numpy as np
 import scipy.sparse as sp
 
-from realtime_world import World, deep_update, load_inputs, score_parts
+from realtime_world import (World, deep_update, load_inputs, score_parts, value_weights,
+                            cell_values, block_values)
 from deploy import candidate_points, deploy
 from solver_backend import solve_qubo, polish_onehot
 
@@ -52,6 +53,7 @@ class Drone:
         self.alpha = float(sensor["alpha_field_response"])
         self.beta = float(sensor["beta_density_resolution"])
         self.cap = float(sc["battery"]["capacity_sec"])
+        self.margin = float(sc["battery"]["reserve_margin"])
         self.battery = self.cap
         self.pos = np.array(start, float)
         self.target = self.pos.copy()
@@ -83,49 +85,63 @@ def build_qubo(world, drones, state, sc):
     hazards = [z for z in state["incidents"] if z["type"] == "hazard" and z["status"] == "found"]
     targets = [z for z in state["incidents"] if z["type"] == "survivor" and z["status"] == "found"]
 
-    # 観測済みでない & 被覆率の要求を満たしていない市町村のマスの価値
-    _, cov, _ = score_parts(world, covered, A, B)
-    wm = np.where(cov < world.req_cov, omega / (world.req_cov * world.Nm), 0.0)
+    t = state["t"]
+    base_m, wm_cov = value_weights(world, state)
     resA = np.maximum(world.req_a - A, 0)
     resB = np.maximum(world.req_b - B, 0)
 
-    cand = []          # dict(d, h, ij, pos, swath, gain, muni, a, b, tgt)
+    cand = []          # dict(d, h, ij, pos, p0, muni, a, b, tgt)
     for d in drones:
         for h in range(H):
             R = h + 1
-            for i in range(-R, R + 1):
-                for j in range(-R, R + 1):
-                    p = d.pos + d.step * np.array([i, j], float)
-                    m = world.muni_at(p)
-                    if m < 0 or (d.region is not None and m != d.region):
-                        continue                       # 担当の市町村の外には出ない
-                    # 親 (1つ前のステップの格子点) から掃く
-                    pi, pj = (0, 0) if h == 0 else (int(np.clip(i, -h, h)), int(np.clip(j, -h, h)))
-                    p0 = d.pos + d.step * np.array([pi, pj], float)
-                    if any(point_seg_dist(np.array([z["x"], z["y"]]), p0, p) <= z["radius_m"]
-                           for z in hazards):
-                        continue
-                    # 戻れなくなる地点は除く
-                    left = d.battery - d.drain * R * sc["plan_step_sec"]
-                    dist = float(np.hypot(*(p - d.base)))
-                    if left < d.drain * dist / d.speed * margin:
-                        continue
-                    sw = world.swath(p0, p, d.r)
-                    sw = sw[~covered[sw]]
-                    a = d.alpha * sc["plan_step_sec"] / per
-                    b = d.beta * sc["plan_step_sec"] / per
-                    tg = [k for k, z in enumerate(targets)
-                          if np.hypot(p[0] - z["x"], p[1] - z["y"]) <= d.r]
-                    cand.append(dict(d=d.i, h=h, ij=(i, j), pos=p, swath=sw, muni=m, a=a, b=b,
-                                     tgt=tg))
+            I, J = np.mgrid[-R:R + 1, -R:R + 1]
+            I, J = I.ravel(), J.ravel()
+            P = d.pos + d.step * np.c_[I, J]
+            m = world.muni_at_many(P)
+            ok = (m >= 0) if d.region is None else (m == d.region)   # 担当の市町村の外には出ない
+            # 親 (1つ前のステップの格子点) から掃く
+            PI, PJ = (np.zeros_like(I), np.zeros_like(J)) if h == 0 else (np.clip(I, -h, h), np.clip(J, -h, h))
+            P0 = d.pos + d.step * np.c_[PI, PJ]
+            for z in hazards:                                         # 飛行禁止区域を横切らない
+                c = np.array([z["x"], z["y"]])
+                v = P - P0
+                L2 = (v ** 2).sum(1)
+                tt = np.clip(((c - P0) * v).sum(1) / np.where(L2 > 0, L2, 1), 0, 1)
+                ok &= np.hypot(*(P0 + tt[:, None] * v - c).T) > z["radius_m"]
+            dhome = np.hypot(*(P - d.base).T)
+            if d.mode == "return":
+                # 帰り道: 1 ステップごとに基地へ 0.8 ステップ以上近づく候補だけ
+                # (道のりは最短の 1.25 倍以内 → 電池の余裕 reserve_margin の範囲で戻れる)
+                ok &= dhome <= np.hypot(*(d.pos - d.base)) - 0.8 * d.step * R
+            else:
+                # 戻れなくなる地点は除く
+                left = d.battery - d.drain * R * sc["plan_step_sec"]
+                ok &= left >= d.drain * dhome / d.speed * margin
+            a = d.alpha * sc["plan_step_sec"] / per
+            b = d.beta * sc["plan_step_sec"] / per
+            for k in np.where(ok)[0]:
+                tg = [q for q, z in enumerate(targets)
+                      if np.hypot(P[k, 0] - z["x"], P[k, 1] - z["y"]) <= d.r]
+                cand.append(dict(d=d.i, h=h, ij=(int(I[k]), int(J[k])), pos=P[k], p0=P0[k],
+                                 r=d.r, muni=int(m[k]), a=a, b=b, tgt=tg))
+    if cand:
+        sws = world.swaths([c["p0"] for c in cand], [c["pos"] for c in cand], [c["r"] for c in cand])
+        for c, sw in zip(cand, sws):
+            c["swath"] = sw
     n = len(cand)
     if n == 0:
         return None
-    slot = np.array([c["d"] * H + c["h"] for c in cand])
+    allsw = np.concatenate([c["swath"] for c in cand])
+    allv = cell_values(world, state, allsw, t, sc, base_m, wm_cov)
+    ptr0 = np.cumsum([0] + [len(c["swath"]) for c in cand])
+    for k, c in enumerate(cand):
+        sw, sv = c["swath"], allv[ptr0[k]:ptr0[k + 1]]
+        c["swath"], c["sval"] = sw[sv > 0], sv[sv > 0]
+    slot = np.array([c["d"] * 100 + c["h"] for c in cand])
     gain = np.zeros(n)
     for k, c in enumerate(cand):
         m = c["muni"]
-        gain[k] = wm[world.muni_flat[c["swath"]]].sum()
+        gain[k] = c["sval"].sum()
         gain[k] += omega / world.req_a[m] * min(c["a"], resA[m])
         gain[k] += omega / world.req_b[m] * min(c["b"], resB[m])
     # 各 (機体, ステップ) では必ず1つ選ぶので, 候補に共通の値を引いても答えは変わらない.
@@ -161,12 +177,68 @@ def build_qubo(world, drones, state, sc):
             # 今の方向を続ける候補に「その機体の最良候補の inertia 倍」を上乗せ.
             # 他の方向が明らかに良いときだけ曲がる (毎秒の解き直しでジグザグしないように)
             gain[k] += so["inertia"] * best[k] + 1e-3 * base
-    lin = -gain
-    P = so["pen"] * max(gain.max(), 1e-12)
-
     rows, cols, vals = [], [], []
     dd = np.array([c["d"] for c in cand])
     hh = np.array([c["h"] for c in cand])
+
+    # ---- 次の目的地 (巡回ブロック) の変数 g[d,j]: 未巡回・期限切れのブロックへ向かわせる
+    pt = sc["patrol"]
+    BV, overdue = block_values(world, state, t, sc, base_m, wm_cov)
+    goals, g_gain = [], []
+    G0 = {}
+    for d in drones:
+        # 新しいマスを 1 ステップ掃いたときの典型的な価値 (目的地の報酬の物差し)
+        G0[d.i] = float(np.median(base_m)) * (2 * d.r * d.step) / world.res ** 2
+        if d.mode == "return":
+            continue                                   # 帰還中は目的地を持たない
+        bs = np.arange(world.NB) if d.region is None else np.where(world.block_muni == d.region)[0]
+        dn = np.hypot(*(world.block_xy[bs] - d.pos).T)
+        dh = np.hypot(*(world.block_xy[bs] - d.base).T)
+        ok = (dn + dh) * d.drain / d.speed * margin <= d.battery       # 行って基地に戻れる
+        bs, dn = bs[ok], dn[ok]
+        if len(bs) == 0 or BV[bs].max() <= 0:
+            continue
+        sc_b = BV[bs] / (1 + dn / 5000.0)
+        top = bs[np.argsort(-sc_b)[: int(pt["goal_candidates"])]]
+        vmax = BV[top].max()
+        for b in top:
+            g = pt["goal_w"] * G0[d.i] * BV[b] / vmax
+            if getattr(d, "goal_block", None) == b:
+                g += 0.3 * pt["goal_w"] * G0[d.i]                       # 目的地を毎秒変えない
+            goals.append(dict(d=d.i, b=int(b), pos=world.block_xy[b], overdue=bool(overdue[b])))
+            g_gain.append(g)
+    ng = len(goals)
+    g_gain = np.array(g_gain)
+    for d in drones:                                                    # 機体ごとに最小値を引く
+        ks = [j for j, gl in enumerate(goals) if gl["d"] == d.i]
+        if ks:
+            g_gain[ks] -= g_gain[ks].min()
+    # 目的地に近づく候補ほど得 (x と g の 2 次の結合)
+    cpl = 0.0
+    cpos = np.array([c["pos"] for c in cand])
+    for j, gl in enumerate(goals):
+        d = by_id[gl["d"]]
+        ks = np.where(dd == d.i)[0]
+        d0 = np.hypot(*(gl["pos"] - d.pos))
+        prog = (d0 - np.hypot(*(cpos[ks] - gl["pos"]).T)) / (d.step * (hh[ks] + 1))
+        r_ = pt["progress_w"] * G0[d.i] * np.minimum(prog, 1.0) * np.where(hh[ks] == 0, 1.0, 0.5)
+        ok = prog > 0
+        rows.append(ks[ok]); cols.append(np.full(ok.sum(), n + j)); vals.append(-r_[ok])
+        if ok.any():
+            cpl = max(cpl, float(r_[ok].max()))
+    # 別の機体が同じ (または隣の) ブロックを目指さない
+    if ng > 1:
+        gpos = np.array([gl["pos"] for gl in goals]); gd = np.array([gl["d"] for gl in goals])
+        gG = np.array([G0[x] for x in gd])
+        iu = np.triu_indices(ng, k=1)
+        near = (gd[iu[0]] != gd[iu[1]]) & \
+               (np.hypot(*(gpos[iu[0]] - gpos[iu[1]]).T) < 1.5 * pt["block_m"])
+        rows.append(n + iu[0][near]); cols.append(n + iu[1][near])
+        vals.append(pt["goal_w"] * np.maximum(gG[iu[0][near]], gG[iu[1][near]]))
+    gain = np.r_[gain, g_gain]
+    slot = np.r_[slot, np.array([gl["d"] * 100 + 99 for gl in goals], int)]
+    lin = -gain
+    P = so["pen"] * max(gain.max(), cpl, 1e-12)
 
     # 重複: S (候補 × マス) から  S W S^T
     ptr = np.cumsum([0] + [len(c["swath"]) for c in cand])
@@ -174,7 +246,7 @@ def build_qubo(world, drones, state, sc):
     if len(idx):
         uniq, col = np.unique(idx, return_inverse=True)          # 候補が見るマスだけに詰める
         S1 = sp.csr_matrix((np.ones(len(idx)), col, ptr), shape=(n, len(uniq)))
-        Sw = sp.csr_matrix((wm[world.muni_flat[idx]], col, ptr), shape=(n, len(uniq)))
+        Sw = sp.csr_matrix((np.concatenate([c["sval"] for c in cand]), col, ptr), shape=(n, len(uniq)))
         OV = sp.triu(Sw @ S1.T, k=1).tocoo()
         keep = slot[OV.row] != slot[OV.col]
         rows.append(OV.row[keep]); cols.append(OV.col[keep]); vals.append(so["lam_ov"] * OV.data[keep])
@@ -206,7 +278,7 @@ def build_qubo(world, drones, state, sc):
             if dd[k1] != dd[k2] and hh[k1] == hh[k2] and set(cand[k1]["tgt"]) & set(cand[k2]["tgt"]):
                 rows.append([k1]); cols.append([k2]); vals.append([tw])
 
-    # one-hot
+    # one-hot (x の各 (機体, ステップ) と 目的地 g の各機体)
     offset = 0.0
     for s in np.unique(slot):
         ks = np.where(slot == s)[0]
@@ -226,14 +298,17 @@ def build_qubo(world, drones, state, sc):
             far = np.abs(ij[k0][:, None, :] - ij[k1][None, :, :]).max(-1) > 1
             a, b = np.nonzero(far)
             rows.append(k0[a]); cols.append(k1[b]); vals.append(np.full(len(a), P))
-    return n, lin, rows, cols, vals, offset, cand
+    return n + ng, lin, rows, cols, vals, offset, cand, goals, slot
 
 
-def choose_targets(sample, cand, lin, rows, cols, vals, drones):
-    """解から各機の次の目的地 (h=0) を決める (one-hot を保った局所探索で磨いてから)"""
-    slot = np.array([c["d"] * 100 + c["h"] for c in cand])
-    sel = polish_onehot(len(cand), lin, rows, cols, vals, slot, sample)
-    return {d.i: cand[sel[d.i * 100]]["pos"] for d in drones if d.i * 100 in sel}
+def choose_targets(sample, n, lin, rows, cols, vals, slot, cand, goals, drones):
+    """解から各機の次の目的地 (h=0 の格子点) と 目指す巡回ブロックを決める
+    (one-hot を保った局所探索で磨いてから)"""
+    sel = polish_onehot(n, lin, rows, cols, vals, slot, sample)
+    nx = len(cand)
+    tg = {d.i: cand[sel[d.i * 100]]["pos"] for d in drones if d.i * 100 in sel}
+    gb = {d.i: goals[sel[d.i * 100 + 99] - nx]["b"] for d in drones if d.i * 100 + 99 in sel}
+    return tg, gb
 
 
 # ------------------------------------------------------------------ シミュレーション
@@ -274,6 +349,7 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
         return False
 
     def apply_deploy(t, trigger, moving_cost):
+        state["t"] = t
         active = [d for d in drones if d.mode != "failed"]
         assign, info = deploy(world, active, pts, reg, state, sc, token=token,
                               moving_cost=moving_cost, seed=int(so["seed"] + t))
@@ -287,6 +363,8 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
                 d.next_pt, d.region = None, int(reg[p])
                 if d.mode == "transit":
                     d.mode = "fly"
+            elif d.mode == "transit":
+                continue                               # 移動中は行き先を変えない (電池の安全のため)
             elif p != d.base_pt and p != d.next_pt:
                 moved.append((d.i, int(d.region), int(reg[p])))
                 d.next_pt, d.region = p, int(reg[p])
@@ -300,7 +378,10 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
 
     state = dict(covered=np.zeros(world.nx * world.ny, bool),
                  first_seen=np.full(world.nx * world.ny, np.inf, np.float32),
-                 A=np.zeros(world.M), B=np.zeros(world.M), incidents=[])
+                 A=np.zeros(world.M), B=np.zeros(world.M), incidents=[],
+                 last_seen=np.full(world.nx * world.ny, -np.inf, np.float32),   # 最後に見た時刻
+                 block_visit=np.full(world.NB, -np.inf),                         # ブロックを最後に通った時刻
+                 block_snaps=[], sc=sc, t=0.0)
     for k, z in enumerate(sc["incidents"]):
         z = dict(z); z["id"] = k
         z["status"] = "scheduled" if z["type"] in ("drone_failure", "battery_fault") else "hidden"
@@ -309,7 +390,8 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
 
     events, replans, track = [], [], []
     if dep.get("enabled", True):
-        pts, reg = candidate_points(world, data, int(dep.get("auto_candidates", 10)))
+        pts, reg = candidate_points(world, data, int(dep.get("auto_candidates", 10)),
+                                    float(dep.get("extra_grid_m", 0)))
         _, counts = apply_deploy(0.0, "initial", moving_cost=False)
         events.append(dict(t=0.0, kind="deploy", msg="初期配置: " + " ".join(
             f"{world.names[m].split(' (')[0]}{c}機" for m, c in enumerate(counts))))
@@ -378,27 +460,31 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
                 print(f"[t={t:6.0f}s] 配置 QUBO: {msg}", flush=True)
 
         # ---- 2) 最適化 (定期 / トラブル発生時は即時)
-        flying = [d for d in drones if d.mode == "fly"]
+        flying = [d for d in drones if d.mode in ("fly", "return")]
         trigger = "event" if new_events else ("periodic" if t - last_plan >= sc["replan_sec"] - 1e-9 else None)
         if trigger and flying:
             tb = time.time()
+            state["t"] = t
             built = build_qubo(world, flying, state, sc)
             t_build = time.time() - tb
             if built is None:
                 for d in flying:
-                    d.mode = "return"
+                    d.mode, d.target = "return", d.base.copy()
             else:
-                n, lin, rows, cols, vals, off, cand = built
+                n, lin, rows, cols, vals, off, cand, goals, slot = built
+                Pq = float(-lin.min())                           # ≒ one-hot のペナルティの大きさ
                 samples, _, t_solve, nq = solve_qubo(
                     n, lin, rows, cols, vals, off, backend=so["backend"],
                     num_reads=so["num_reads"], num_sweeps=so["num_sweeps"],
-                    seed=int(so["seed"] + t), token=token, time_limit_ms=so["time_limit_ms"])
-                tg = choose_targets(samples[0], cand, lin, rows, cols, vals, flying)
+                    seed=int(so["seed"] + t), token=token, time_limit_ms=so["time_limit_ms"],
+                    beta_range=(np.log(2) / (2 * Pq), np.log(100) / (0.005 * Pq)))
+                tg, gb = choose_targets(samples[0], n, lin, rows, cols, vals, slot, cand, goals, flying)
                 for d in flying:
+                    d.goal_block = gb.get(d.i)
                     if d.i in tg:
                         d.target = tg[d.i]
-                    else:
-                        d.mode = "return"      # 戻れる候補しか残っていない
+                    else:                       # 戻れる候補が残っていない → 基地へ一直線
+                        d.mode, d.target = "return", d.base.copy()
                 replans.append(dict(t=t, trigger=trigger, n_drones=len(flying), n_vars=int(n),
                                     n_quadratic=int(nq), build_ms=1000 * t_build,
                                     solve_ms=1000 * t_solve,
@@ -423,8 +509,9 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
                 need = d.drain * (dist / d.speed * margin + dt)
                 if d.battery - d.drain * dt < need:
                     d.mode = "return"
-            goal = {"return": d.base, "transit": pts[d.next_pt] if d.next_pt is not None else d.base
-                    }.get(d.mode, d.target)
+            if d.mode == "return" and np.hypot(*(d.target - d.base)) >= dist - 1e-6:
+                d.target = d.base.copy()        # 基地へ近づかない目的地は使わない
+            goal = pts[d.next_pt] if d.mode == "transit" and d.next_pt is not None else d.target
             v = goal - d.pos
             L = float(np.hypot(*v))
             step = min(L, d.speed * dt)
@@ -433,14 +520,20 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
             fresh = sw[~state["covered"][sw]]
             state["covered"][fresh] = True
             state["first_seen"][fresh] = t + dt
+            state["last_seen"][sw] = t + dt
+            c_ = world.cell_of(new)
+            if c_ >= 0 and world.block_of[c_] >= 0:
+                state["block_visit"][world.block_of[c_]] = t + dt          # このブロックを巡回した
             m = world.muni_at(new)
             if m >= 0:
                 state["A"][m] += d.alpha * dt / sc["alpha_beta_per_sec"]
                 state["B"][m] += d.beta * dt / sc["alpha_beta_per_sec"]
             d.pos = new
             d.battery -= d.drain * dt
-            if d.mode == "return" and L <= d.speed * dt + 1e-6:
+            if d.mode == "return" and np.hypot(*(new - d.base)) <= 1e-6:
                 d.mode = "charge"
+            elif d.mode == "return" and L <= d.speed * dt + 1e-6:
+                d.target = d.base.copy()        # 途中の目的地に着いた → 次の秒の最適化まで基地へ
             elif d.mode == "transit" and L <= d.speed * dt + 1e-6:   # 新しい基地に着いた
                 d.base_pt, d.base, d.next_pt = d.next_pt, pts[d.next_pt].copy(), None
                 d.mode, d.target = "fly", d.pos.copy()
@@ -451,7 +544,12 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
 
         t += dt
         sc_now, _, met = score_parts(world, state["covered"], state["A"], state["B"])
-        track.append(dict(t=t, score=sc_now, met=met,
+        bv = state["block_visit"]
+        visited = float(np.isfinite(bv).mean())                                     # 一度でも巡回
+        fresh_b = float((t - bv <= sc["patrol"]["revisit_sec"]).mean())             # 期限内に巡回
+        if int(t) % int(sc.get("video_every_sec", 15)) == 0:
+            state["block_snaps"].append((t, bv.copy()))
+        track.append(dict(t=t, score=sc_now, met=met, visited=round(visited, 4), fresh=round(fresh_b, 4),
                           pos=[[round(float(d.pos[0]), 1), round(float(d.pos[1]), 1)] for d in drones],
                           bat=[round(d.battery / d.cap, 3) for d in drones],
                           mode=[d.mode for d in drones],
@@ -459,6 +557,7 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
                           region=[-1 if d.region is None else int(d.region) for d in drones]))
         if verbose and int(t) % 300 == 0:
             print(f"[t={t:6.0f}s] score={sc_now:.3f} 要求達成 {met}/{3 * world.M} "
+                  f"巡回済み {visited:.0%} 期限内 {fresh_b:.0%} "
                   f"飛行 {sum(d.mode == 'fly' for d in drones)} / 帰還 {sum(d.mode == 'return' for d in drones)} / "
                   f"充電 {sum(d.mode == 'charge' for d in drones)} / 待機 {sum(d.mode == 'standby' for d in drones)} / "
                   f"移動 {sum(d.mode == 'transit' for d in drones)} / "
@@ -477,6 +576,11 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
                                     req_beta=float(world.req_b[m])) for m in range(world.M)],
                incidents=[{k: v for k, v in z.items()} for z in state["incidents"]],
                events=events,
+               patrol=dict(blocks=int(world.NB), block_m=sc["patrol"]["block_m"],
+                           revisit_sec=sc["patrol"]["revisit_sec"],
+                           visited=track[-1]["visited"] if track else 0.0,
+                           fresh=track[-1]["fresh"] if track else 0.0,
+                           cells_seen=float(state["covered"][world.cells].mean())),
                replans_total=len(replans),
                replans_by_event=sum(r["trigger"] == "event" for r in replans),
                solve_ms_mean=float(sm.mean()), solve_ms_max=float(sm.max()),
@@ -487,6 +591,8 @@ def run(data_path, scenario_path=None, overrides=None, token=None, realtime=Fals
                deployments=deployments,
                drones=[dict(id=d.i, sensor=d.sensor, r=d.r, speed=d.speed) for d in drones])
     if verbose:
+        print(f"[結果] 巡回済みブロック {out['patrol']['visited']:.0%} / 期限内 {out['patrol']['fresh']:.0%} / "
+              f"一度でも見たマス {out['patrol']['cells_seen']:.1%}")
         print(f"[結果] score={score:.3f} 要求達成 {met}/{3 * world.M} / 最適化 {len(replans)} 回 "
               f"(うちトラブル起因 {out['replans_by_event']} 回) / 1回あたり 構築 {out['build_ms_mean']:.0f} ms + "
               f"求解 {out['solve_ms_mean']:.0f} ms / 実時間 {out['wall_sec']:.0f} s")
@@ -511,7 +617,11 @@ if __name__ == "__main__":
         ov["solver"] = {"backend": a.backend}
     res, world, state = run(a.data, a.scenario, ov, a.token, a.realtime)
     json.dump(res, open(a.out, "w"), ensure_ascii=False)
-    print("saved:", a.out)
+    # 動画を後から作り直せるように, 地図上の観測状態も保存する
+    np.savez_compressed(a.out + ".state.npz", first_seen=state["first_seen"],
+                        snap_t=np.array([x[0] for x in state["block_snaps"]]),
+                        snap_v=np.array([x[1] for x in state["block_snaps"]]))
+    print("saved:", a.out, a.out + ".state.npz")
     if a.video:
         from realtime_video import make_video
         make_video(res, world, state, a.video)

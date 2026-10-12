@@ -138,6 +138,28 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
             if detail:
                 a.text(x + 0.15, y + 0.15, str(d + 1), fontsize=7, zorder=9)
 
+    # 巡回ブロックの色: 未巡回 = 灰, 最近巡回 = 緑 → 期限が近い = 黄, 期限切れ = 赤
+    snaps = state.get("block_snaps") or []
+    snap_t = np.array([s_[0] for s_ in snaps]) if snaps else np.zeros(0)
+    revisit = float(sc.get("patrol", {}).get("revisit_sec", 3600))
+    c_green, c_yel, c_red = (np.array(matplotlib.colors.to_rgb(c)) for c in ("#3fae5a", "#f1c40f", "#e74c3c"))
+    c_never = np.array(matplotlib.colors.to_rgb("#d9d9d9"))
+    bo = world.block_of
+
+    def block_img(t):
+        img = base.copy()
+        if len(snap_t) == 0 or not hasattr(world, "NB"):
+            img[seen <= t] = green
+            return img
+        bv = snaps[max(0, int(np.searchsorted(snap_t, t, side="right")) - 1)][1]
+        age = t - bv
+        f = np.clip(age / revisit, 0, 1)[:, None]
+        col = c_green * (1 - f) + c_yel * f
+        col[age > revisit] = c_red
+        col[~np.isfinite(bv)] = c_never
+        img[world.cells] = 0.55 * col[bo[world.cells]] + 0.45 * base[world.cells]
+        return img
+
     def draw(fi):
         k = frames[fi]
         t = times[k]
@@ -146,16 +168,17 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
         img = base.copy()
         img[seen <= t] = green
         img = img.reshape(world.ny, world.nx, 3)
-        # 全体図 (描画を軽くするため 2 マスおきに間引く)
-        draw_map(ax, k, t, img[::2, ::2], detail=False)
+        # 全体図: 巡回ブロックの状態 (描画を軽くするため 2 マスおきに間引く)
+        draw_map(ax, k, t, block_img(t).reshape(world.ny, world.nx, 3)[::2, ::2], detail=False)
         c, why = focus(t)
         h = zoom_km / 2
         ax.add_patch(plt.Rectangle((c[0] - h, c[1] - h), zoom_km, zoom_km, fill=False, ec="#8e44ad", lw=1.5,
                                    zorder=9))
         ax.set_xlim(ext[0], ext[1]); ax.set_ylim(ext[2], ext[3]); ax.set_aspect("equal")
         ax.tick_params(labelsize=7)
-        ax.set_title(f"全体図  t = {int(t) // 60:02d}:{int(t) % 60:02d}   ● 飛行  ◆ 配置換えで移動  "
-                     f"○ 帰還/充電/待機  × 故障  ▲ 基地", fontsize=9)
+        ax.set_title(f"全体図  t = {int(t) // 3600}:{int(t) % 3600 // 60:02d}:{int(t) % 60:02d}  "
+                     f"ブロック: 灰=未巡回 緑=最近 黄=期限間近 赤=期限切れ ({revisit / 60:.0f}分)\n"
+                     f"● 飛行  ◆ 配置換えで移動  ○ 帰還/充電/待機  × 故障  ▲ 基地", fontsize=8.5)
         # 拡大図
         draw_map(axz, k, t, img, detail=True)
         axz.set_xlim(c[0] - h, c[0] + h); axz.set_ylim(c[1] - h, c[1] + h); axz.set_aspect("equal")
@@ -171,7 +194,8 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
         for i, e in enumerate(evs):
             red = "found" in e["kind"] or e["kind"] in ("drone_failure", "battery_fault", "battery_empty")
             dep = e["kind"] in ("deploy", "redeploy")
-            axe.text(0.0, 0.82 - i * 0.13, f"{int(e['t']) // 60:02d}:{int(e['t']) % 60:02d}  {e['msg']}"
+            te = int(e["t"])
+            axe.text(0.0, 0.82 - i * 0.13, f"{te // 3600}:{te % 3600 // 60:02d}:{te % 60:02d}  {e['msg']}"
                      + ("" if dep else "  → QUBO 組み直し"), fontsize=8, transform=axe.transAxes,
                      color="#a00" if red else ("#1f5fa8" if dep else "#2c7a3f"), va="top")
         if not evs:
@@ -189,15 +213,37 @@ def make_video(res, world, state, out_path, fps=10, trail_sec=180, zoom_km=10.0)
         axb.set_yticks(range(D)); axb.set_yticklabels([str(d + 1) for d in range(D)], fontsize=6.5)
         axb.tick_params(axis="x", labelsize=7)
         axb.set_title("バッテリー残量と状態\n赤=ALPHA 青=BETA 緑=GAMMA", fontsize=9)
-        # スコア
-        axs.plot(times / 60, scores, "-", color="#ccc", lw=1.5)
-        axs.plot(times[:k + 1] / 60, scores[:k + 1], "-", color="#d62728", lw=2)
-        axs.set_xlim(0, times[-1] / 60); axs.set_ylim(0, 1); axs.grid(alpha=.3)
-        axs.set_title(f"総合スコア {scores[k]:.3f}", fontsize=9)
-        axs.set_xlabel("分", fontsize=8)
+        # スコアと巡回
+        xs = times / 3600
+        axs.plot(xs[:k + 1], scores[:k + 1], "-", color="#d62728", lw=1.8, label="総合スコア")
+        if "visited" in track[0]:
+            vis = np.array([tr["visited"] for tr in track]); fr = np.array([tr["fresh"] for tr in track])
+            axs.plot(xs[:k + 1], vis[:k + 1], "-", color="#7f8c8d", lw=1.5, label="巡回済み")
+            axs.plot(xs[:k + 1], fr[:k + 1], "-", color="#27ae60", lw=1.8, label="期限内")
+            axs.set_title(f"スコア {scores[k]:.3f} / 巡回済み {vis[k]:.0%} / 期限内 {fr[k]:.0%}", fontsize=8.5)
+        else:
+            axs.set_title(f"総合スコア {scores[k]:.3f}", fontsize=9)
+        axs.set_xlim(0, xs[-1]); axs.set_ylim(0, 1); axs.grid(alpha=.3)
+        axs.legend(fontsize=6.5, loc="upper left")
+        axs.set_xlabel("時間 [h]", fontsize=8)
         axs.tick_params(labelsize=7)
 
     ani = animation.FuncAnimation(fig, draw, frames=len(frames), interval=1000 / fps)
     ani.save(out_path, writer=animation.FFMpegWriter(fps=fps, codec="libx264",
                                                      extra_args=["-pix_fmt", "yuv420p"]))
     plt.close(fig)
+
+
+if __name__ == "__main__":
+    # 保存した結果から動画だけ作り直す:
+    #   python realtime_video.py realtime_run.json realtime_run.mp4
+    import json
+    import sys
+    from realtime_world import World, load_inputs
+    res = json.load(open(sys.argv[1], encoding="utf-8"))
+    st = np.load(sys.argv[1] + ".state.npz")
+    data, _ = load_inputs(res["data"])
+    world = World(data, res["scenario"])
+    state = dict(first_seen=st["first_seen"], block_snaps=list(zip(st["snap_t"], st["snap_v"])))
+    make_video(res, world, state, sys.argv[2])
+    print("saved:", sys.argv[2])

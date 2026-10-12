@@ -9,6 +9,8 @@ deploy.py : 各市町村 (領域) に複数のドローンを配置する QUBO
                                                    ... 被覆・alpha・beta の未達成の度合いの割合に
                                                        見合った能力 (機種) を割り当てる
                                                        (w_k = その能力の未達成の度合いの平均)
+     - Σ wc u_p y + Σ wc (範囲の重なり) y y'         ... 基地から往復できる範囲に 未巡回・期限切れの
+                                                       ブロックが多い地点を選ぶ (2基地の重なりは減点)
      + Σ (同じ市町村で近い基地どうし) ws (1 - 距離/spread) y y'   ... 基地をばらけさせる
      + Σ (配置換えのコスト: 市町村が変わる / 移動距離) y          ... 見直し時だけ
      + P Σ_d (Σ_p y[d,p] - 1)^2 + P Σ_p Σ_{d<d'} y[d,p] y[d',p]   ... 1機1基地, 1地点1機
@@ -17,13 +19,21 @@ deploy.py : 各市町村 (領域) に複数のドローンを配置する QUBO
 """
 import numpy as np
 
-from realtime_world import score_parts
+from realtime_world import score_parts, value_weights, block_values
 from solver_backend import solve_qubo, polish_onehot, qubo_energy
 
 
-def candidate_points(world, data, n_auto=10):
-    """市町村ごとの候補地点 (m 座標) と その市町村番号"""
+def candidate_points(world, data, n_auto=10, extra_grid_m=0):
+    """市町村ごとの候補地点 (m 座標) と その市町村番号.
+    データの候補地点に加え, extra_grid_m 間隔の補助地点を足す (基地を未探索の場所へ移せるように)"""
     pts, reg = [], []
+    if extra_grid_m:
+        gx = np.arange(world.x0 + extra_grid_m / 2, world.x0 + world.nx * world.res, extra_grid_m)
+        gy = np.arange(world.y0 + extra_grid_m / 2, world.y0 + world.ny * world.res, extra_grid_m)
+        G = np.array([[x, y] for y in gy for x in gx])
+        gm = world.muni_at_many(G)
+        pts += list(G[gm >= 0])
+        reg += list(gm[gm >= 0])
     for m, mu in enumerate(data["municipalities"]):
         got = []
         for c in mu.get("candidate_locations") or []:
@@ -107,6 +117,34 @@ def build_deploy_qubo(world, drones, pts, reg, state, dep, moving_cost=True):
         for k, sh in shares.items():
             add_square(idx, rates[k][dd[idx]] / rates[k].sum(), float(sh[m]), wb * M * wk[k])
 
+    # 基地から往復できる範囲 (半径 Rc) にある「未巡回・期限切れの価値」. 多いほど良い基地.
+    # 2つの基地の範囲が重なる分はペナルティ (同じところを2機で回らない)
+    t = state.get("t", 0.0)
+    base_m, wm_cov = value_weights(world, state)
+    BV, _ = block_values(world, state, t, state["sc"], base_m, wm_cov)
+    one_way = np.median([d.cap / d.drain * d.speed / d.margin / 2 for d in drones])
+    Rc = 0.7 * one_way
+    Db = np.hypot(*(pts[:, None, :] - world.block_xy[None, :, :]).transpose(2, 0, 1))   # (Np, NB)
+    inside = (Db <= Rc) & (world.block_muni[None, :] == reg[:, None])
+    U = inside.astype(float) @ BV
+    Umax = np.array([max(U[reg == m].max(), 1e-12) if (reg == m).any() else 1.0 for m in range(M)])
+    u = U / Umax[reg]
+    wc = float(dep.get("catch_w", 2.0)) / M
+    for di in range(D):
+        lin[di * Np:(di + 1) * Np] -= wc * u
+    for m in range(M):
+        ps = np.where(reg == m)[0]
+        if len(ps) < 2:
+            continue
+        ov = (inside[ps].astype(float) * BV) @ inside[ps].T.astype(float) / Umax[m]   # 重なりの価値
+        a_, b_ = np.triu_indices(len(ps), k=1)
+        w_ = wc * ov[a_, b_]
+        nzp = w_ > 1e-9
+        for pa, pb, w in zip(ps[a_[nzp]], ps[b_[nzp]], w_[nzp]):
+            I, J = np.meshgrid(np.arange(D) * Np + pa, np.arange(D) * Np + pb, indexing="ij")
+            off = ~np.eye(D, dtype=bool)
+            rows.append(I[off]); cols.append(J[off]); vals.append(np.full(off.sum(), w))
+
     # 同じ市町村の近い基地どうし
     spread = float(dep["spread_m"])
     for m in range(M):
@@ -132,6 +170,8 @@ def build_deploy_qubo(world, drones, pts, reg, state, dep, moving_cost=True):
             keep = d.next_pt if d.next_pt is not None else d.base_pt
             dist = np.hypot(*(pts - d.pos).T)
             cost = (0.3 + 0.5 * (reg != d.region) + 1.0 * np.minimum(dist / (d.speed * 900), 3)) / M
+            if d.mode == "transit":
+                cost = np.full(Np, 20.0 / M)       # 移動中の機体は行き先を変えない (電池の安全のため)
             cost[keep] = 0.0
             lin[di * Np:(di + 1) * Np] += cost
 

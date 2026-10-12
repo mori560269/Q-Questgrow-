@@ -46,7 +46,15 @@ DEFAULT_SCENARIO = {
                    "min_per_region": 2,       # 1つの市町村に置く最少機数
                    "redeploy_sec": 900,       # 配置を見直す間隔 [s] (故障・電池切れ時は即時)
                    "spread_m": 6000,          # 同じ市町村の基地どうしをこれより離したい
-                   "auto_candidates": 10},    # 候補地点がデータに無い市町村は自動で作る数
+                   "auto_candidates": 10,     # 候補地点がデータに無い市町村は自動で作る数
+                   "extra_grid_m": 10000,     # 候補地点に足す補助地点の間隔 [m] (0 で足さない)
+                   "catch_w": 2.0},           # 基地から届く範囲の「未巡回の価値」の重み
+    # 巡回: 地域をブロックに分け, 一定時間 (revisit_sec) 通っていないブロックを巡回し直す
+    "patrol": {"block_m": 3000,             # 巡回ブロックの一辺 [m]
+               "revisit_sec": 3600,         # これを過ぎたブロックは「期限切れ」→ 優先 (価値 2 倍)
+               "patrol_w": 0.5,             # 一度見たマスが時間とともに取り戻す価値 (未観測 = 1)
+               "goal_candidates": 6,        # 各機の「次の目的地」候補のブロック数
+               "goal_w": 1.0, "progress_w": 1.0},
     "incidents": [],            # トラブル (data/scenario_example.json 参照)
     "solver": {"backend": "neal", "num_reads": 4, "num_sweeps": 200, "time_limit_ms": 500,
                "lam_ov": 0.5, "pen": 3.0, "target_factor": 5.0, "inertia": 0.5, "seed": 0},
@@ -137,6 +145,23 @@ class World:
             self.stations = cent
         self._disk = {}
 
+        # 巡回ブロック (block_m 四方). 地域内のマスだけで作る
+        bm = float(sc["patrol"]["block_m"])
+        xy = self.cell_xy(self.cells)
+        key = (((xy[:, 1] - self.y0) // bm).astype(np.int64) * 100000 +
+               ((xy[:, 0] - self.x0) // bm).astype(np.int64))
+        uk, binv = np.unique(key, return_inverse=True)
+        self.NB = len(uk)
+        self.block_of = np.full(self.nx * self.ny, -1, np.int32)
+        self.block_of[self.cells] = binv
+        cnt = np.bincount(binv, minlength=self.NB)
+        self.block_xy = np.c_[np.bincount(binv, xy[:, 0], self.NB), np.bincount(binv, xy[:, 1], self.NB)] / cnt[:, None]
+        mb = self.muni_flat[self.cells]
+        bm_cnt = np.zeros((self.NB, self.M), int)
+        np.add.at(bm_cnt, (binv, mb), 1)
+        self.block_muni = bm_cnt.argmax(1)
+        self.block_ncell = cnt
+
     # --- 座標とマス
     def cell_of(self, p):
         j = int((p[0] - self.x0) // self.res)
@@ -166,6 +191,41 @@ class World:
             self._disk[r] = np.c_[ii[m], jj[m]]
         return self._disk[r]
 
+    def muni_at_many(self, P):
+        j = ((P[:, 0] - self.x0) // self.res).astype(int)
+        i = ((P[:, 1] - self.y0) // self.res).astype(int)
+        ok = (i >= 0) & (i < self.ny) & (j >= 0) & (j < self.nx)
+        out = np.full(len(P), -1)
+        out[ok] = self.muni_flat[i[ok] * self.nx + j[ok]]
+        return out
+
+    def swaths(self, P0, P1, R):
+        """swath を多数の線分についてまとめて計算する (候補ごとに呼ぶより速い)"""
+        P0, P1, R = np.asarray(P0, float), np.asarray(P1, float), np.asarray(R, float)
+        NC = self.nx * self.ny
+        out = [np.zeros(0, int)] * len(P0)
+        for r in np.unique(R):
+            ids = np.where(R == r)[0]
+            L = np.hypot(*(P1[ids] - P0[ids]).T)
+            n = max(2, int(np.ceil(L.max() / max(r * 0.5, self.res))) + 1)
+            s = np.linspace(0, 1, n)
+            pts = P0[ids][:, None, :] + (P1[ids] - P0[ids])[:, None, :] * s[None, :, None]
+            ci = ((pts[..., 1] - self.y0) // self.res).astype(np.int64)
+            cj = ((pts[..., 0] - self.x0) // self.res).astype(np.int64)
+            off = self.disk(r)
+            ii = ci[..., None] + off[:, 0]
+            jj = cj[..., None] + off[:, 1]
+            ok = (ii >= 0) & (ii < self.ny) & (jj >= 0) & (jj < self.nx)
+            g = np.broadcast_to(np.arange(len(ids))[:, None, None], ii.shape)
+            key = np.unique(g[ok].astype(np.int64) * NC + ii[ok] * self.nx + jj[ok])
+            gk, fk = key // NC, key % NC
+            keep = self.muni_flat[fk] >= 0
+            gk, fk = gk[keep], fk[keep]
+            cut = np.searchsorted(gk, np.arange(len(ids) + 1))
+            for a, k in enumerate(ids):
+                out[k] = fk[cut[a]:cut[a + 1]]
+        return out
+
     def swath(self, p0, p1, r):
         """p0 → p1 を半径 r で掃いたときに見えるマス (地域内のみ, flat index)"""
         L = float(np.hypot(*(p1 - p0)))
@@ -191,3 +251,38 @@ def score_parts(world, covered, A, B):
     score = float((rc + ra + rb).sum() / (3 * world.M))
     met = int((cov >= world.req_cov - 1e-9).sum() + (A >= world.req_a).sum() + (B >= world.req_b).sum())
     return score, cov, met
+
+
+# ------------------------------------------------------------------ 巡回の価値
+def value_weights(world, state):
+    """市町村ごとのマス1つの重み base_m と, 被覆率の要求が残っている市町村だけの重み wm_cov"""
+    M = world.M
+    base_m = 1.0 / (3 * M) / (world.req_cov * world.Nm)
+    _, cov, _ = score_parts(world, state["covered"], state["A"], state["B"])
+    return base_m, np.where(cov < world.req_cov, base_m, 0.0)
+
+
+def cell_values(world, state, idx, t, sc, base_m, wm_cov):
+    """マスの価値. 未観測なら (被覆の要求分 + 巡回分), 観測済みなら 時間とともに巡回分が戻る"""
+    pt = sc["patrol"]
+    ls = state["last_seen"][idx]
+    m = world.muni_flat[idx]
+    never = ~np.isfinite(ls)
+    age = np.where(never, 0.0, t - np.where(never, 0.0, ls))
+    return np.where(never, wm_cov[m] + pt["patrol_w"] * base_m[m],
+                    pt["patrol_w"] * base_m[m] * np.minimum(1.0, age / pt["revisit_sec"]))
+
+
+def block_values(world, state, t, sc, base_m, wm_cov):
+    """巡回ブロックの価値 (ブロックの状態で決める).
+       未巡回 = 3, 期限切れ (revisit_sec 以上 通っていない) = 2,
+       巡回済み = 通った直後 0 → revisit_sec で 1 に戻る. これに ブロックの広さ (マスの重みの和) を掛ける"""
+    if "block_w" not in state:
+        state["block_w"] = np.bincount(world.block_of[world.cells], base_m[world.muni_flat[world.cells]],
+                                       minlength=world.NB)
+    rv = float(sc["patrol"]["revisit_sec"])
+    bv = state["block_visit"]
+    never = ~np.isfinite(bv)
+    age = np.where(never, np.inf, t - np.where(never, 0.0, bv))
+    f = np.where(never, 3.0, np.where(age > rv, 2.0, age / rv))
+    return state["block_w"] * f, never | (age > rv)
