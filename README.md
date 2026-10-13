@@ -2,6 +2,23 @@
 
 災害救助ドローンの観測計画を **QUBO（Fixstars Amplify / 焼きなまし）** と **MILP（厳密解法）** で解いて比べるコード集です。
 
+## 元の課題: 固定センサーの最適配置（`placement/`）
+
+国際航業の課題「センサーの最適配置」（総調達コストの最小化）を、Amplify の QUBO と古典的手法で解いて比べました。
+**式と結果の詳細は [`placement/README.md`](placement/README.md)** にあります。
+
+| 手法 | コスト | 最適との差 | 時間 |
+|---|---|---|---|
+| MILP（HiGHS、厳密解） | **6,160** | 最適 | 3 秒 |
+| 貪欲法 | 6,260 | +1.6% | 14 秒 |
+| QUBO 1（Amplify の制約・スラックあり）＋修復 | 6,580 | +6.8% | 11 秒（生の解は 5 回とも制約違反） |
+| QUBO 2（ラグランジュ緩和・スラックなし） | 6,480 | +5.2% | 9 秒（修復なしで実行可能） |
+| QUBO 2 ＋修復 | 6,300 | +2.3% | |
+
+QUBO は Amplify SDK で定式化し、この環境ではローカルの焼きなまし（neal）で解いています（Amplify AE での実行は
+[Colab ノートブック](https://colab.research.google.com/github/mori560269/Q-Questgrow-/blob/claude/request-5v4fsc/placement/placement_amplify.ipynb)
+または `AMPLIFY_TOKEN=xxxx python placement/run_compare.py --backend amplify`）。
+
 ## まず見るところ: 毎秒最適化 + トラブル対応（`realtime_drone.py`）
 
 任意の地域データ（JSON）で、20 機のドローンを **各市町村（領域）に複数機ずつ配置**し、
