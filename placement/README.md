@@ -122,7 +122,14 @@ E(x) = Σ_i c_i x_i
 - 「修復」は、貪欲法の手で足りない分を補い、要らないセンサーを外す後処理です。
 - 地図: `results/placement_maps.png`。数値: `results/placement_compare.json`。
 - QUBO はすべて **Amplify SDK で組んだモデル**です。この開発環境からは Fixstars のサーバーに接続できないため、Amplify が変換した QUBO を**ローカルの焼きなまし（neal）**で解きました。**Amplify AE での結果ではありません。**
-  AE で解くには、`AMPLIFY_TOKEN=xxxx python placement/run_compare.py --backend amplify` か、`placement/placement_amplify.ipynb`（Colab）を使ってください。
+  AE で解くには、`AMPLIFY_TOKEN=xxxx python placement/run_compare.py --backend amplify` か、Colab の
+  [`placement/placement_amplify.ipynb`](https://colab.research.google.com/github/mori560269/Q-Questgrow-/blob/claude/request-5v4fsc/placement/placement_amplify.ipynb)
+  を使ってください。ノートブックでは次の 3 つを実行できます。
+  - 全手法の比較
+  - 同じ時間でどこまで良い解が出るか（MILP の時間制限も変える）
+  - 候補地を増やした規模の比較
+
+  トークンを空欄にすると、ローカルの焼きなましで同じ比較を行います。
 
 ### 分かったこと
 - **この規模（変数 258 個）では、古典の MILP が圧倒的**です。3 秒で最適解が出て、最適であることの証明（gap 0）まで付きます。

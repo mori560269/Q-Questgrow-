@@ -25,7 +25,8 @@ DATA = os.path.join(HERE, "..", "data", "data_transformed.json")
 
 
 class Problem:
-    def __init__(self, data_path=DATA, cell_m=1000.0):
+    def __init__(self, data_path=DATA, cell_m=1000.0, extra_grid_m=None):
+        """extra_grid_m: 規模を変えた比較用. この間隔の格子点を設置候補地として足す (None なら元の 86 か所)"""
         raw = json.load(open(data_path, encoding="utf-8"))
         self.raw = raw
         self.sens = raw["sensor_specifications"]
@@ -46,6 +47,15 @@ class Problem:
         for m, x in enumerate(mu):
             for c in x["candidate_locations"]:
                 pts.append([c["x"], c["y"]]); preg.append(m); pid.append(c["id"])
+        if extra_grid_m:
+            allv = np.vstack(self.polys)
+            lo, hi = allv.min(0), allv.max(0)
+            for gx in np.arange(lo[0] + extra_grid_m / 2, hi[0], extra_grid_m):
+                for gy in np.arange(lo[1] + extra_grid_m / 2, hi[1], extra_grid_m):
+                    for m, poly in enumerate(self.polys):
+                        if Path(poly).contains_point((gx, gy)):
+                            pts.append([gx, gy]); preg.append(m); pid.append(f"X{len(pid)}")
+                            break
         self.pts, self.preg, self.pid = np.array(pts), np.array(preg), pid
         self.P = len(self.pts)
         self.pref = np.array(raw["prefecture_outer_boundary"]["vertices"], float)

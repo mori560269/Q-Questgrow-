@@ -221,6 +221,7 @@ def solve_lagrangian(prob, iters=40, eta=1.0, backend="neal", token=None, time_l
     nu = np.full(M, 30.0)                          # α 1 の値段
     rho = np.full(M, 15.0)                         # β 1 の値段
     best, history, n_feasible = None, [], 0
+    least = None                                   # 実行可能な解が無いとき用: 不足が最も少ない解
     for it in range(iters):
         lin, Q = lagrangian_qubo(prob, terms, mu, nu, rho)
         sols = solve_inner(lin, Q, backend, token, time_limit_ms, num_reads, num_sweeps, seed + it)
@@ -236,6 +237,10 @@ def solve_lagrangian(prob, iters=40, eta=1.0, backend="neal", token=None, time_l
         n_feasible += int(feas)
         if feas and (best is None or cost < best[0]):
             best = (cost, x.copy(), it)
+        short = (np.maximum(T - cv, 0) / T).sum() + (np.maximum(prob.req_a - A, 0) / prob.req_a).sum() \
+            + (np.maximum(prob.req_b - B, 0) / prob.req_b).sum() + (0 if one_ok else 1)
+        if least is None or short < least[0]:
+            least = (short, x.copy())
         history.append(dict(it=it, cost=cost, feasible=bool(feas),
                             cov_short=int(np.maximum(T - cv, 0).sum()),
                             a_short=float(np.maximum(prob.req_a - A, 0).sum()),
@@ -251,5 +256,6 @@ def solve_lagrangian(prob, iters=40, eta=1.0, backend="neal", token=None, time_l
         nu *= np.exp(step * np.where(g_a > 0, g_a * 3, g_a * 0.5))
         rho *= np.exp(step * np.where(g_b > 0, g_b * 3, g_b * 0.5))
     return best, dict(sec=time.time() - t0, iters=iters, feasible_iters=n_feasible, history=history,
+                      least_violating_x=least[1],
                       n_vars=prob.P * prob.K, final_mu=mu.round(3).tolist(),
                       final_nu=nu.round(2).tolist(), final_rho=rho.round(2).tolist())
