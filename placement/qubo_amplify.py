@@ -164,7 +164,8 @@ def build_model(prob, margin=0.01, lam1=3.0, lam45=100.0):
     model = Model(objective + 2 * cmax * one, cons)
     info = dict(n_x=P * K, n_y=len(cells), cells_merged_from=int(prob.N), margin=margin,
                 weights=dict(coverage=f"{lam1}*c_max/T_m", consistency=4 * lam1 * cmax,
-                             one_per_point=2 * cmax, alpha_beta=lam45))
+                             one_per_point=2 * cmax, alpha_beta=lam45),
+                y_ids=[int(v.as_variable().id) for v in y])
     return model, x, info
 
 
