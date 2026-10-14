@@ -9,6 +9,8 @@ placement/classical.py : 古典的な解き方 (QUBO を使わない)
             Σ_{g∈m} y[g] >= req_cov_m · N_m               (面的充足率)
             Σ_k x[p,k] <= 1                               (1候補地に1台まで)
             Σ_{p∈m,k} α_k x[p,k] >= req_α_m,  β も同様     (α・β出力)
+      マスが細かいときのために, 同じ市町村で「覆えるセンサーの組」が同じマスは 1 つの y にまとめ,
+      マス数 w を重みにする (Σ w_c y_c >= req·N_m. 最適解は まとめない場合と同じ)
 
   (B) 貪欲法 (コスト当たりの「制約の不足をどれだけ埋めるか」が最大の手 (置く / 種類を変える) を
       繰り返し, 行き詰まったら 2 手の組み合わせも試す. 最後に要らないセンサーを高い順に外す)
@@ -20,17 +22,23 @@ from scipy.optimize import milp, LinearConstraint, Bounds
 
 
 def solve_milp(prob, time_limit=300, margin=0.0):
-    P, K, N, M = prob.P, prob.K, prob.N, prob.M
+    P, K, M = prob.P, prob.K, prob.M
     nx = P * K
+    # 覆えるセンサーの組が同じマスをまとめる (市町村ごと). w = まとめたマスの数
+    _, first, inv, w = np.unique(np.c_[prob.creg[:, None].astype(np.uint8),
+                                       np.packbits(prob.cover, axis=1)], axis=0,
+                                 return_index=True, return_inverse=True, return_counts=True)
+    N = len(first)
+    creg, cover = prob.creg[first], prob.cover[first]
     n = nx + N
     c = np.r_[np.tile(prob.cost, P), np.zeros(N)]
     rows = []
-    # y[g] - Σ cover x <= 0
-    cov = sp.csr_matrix(prob.cover.astype(float))
+    # y[c] - Σ cover x <= 0
+    cov = sp.csr_matrix(cover.astype(float))
     A1 = sp.hstack([-cov, sp.identity(N)])
     rows.append((A1, -np.inf, 0))
-    # Σ_{g∈m} y >= req·N_m
-    G = sp.csr_matrix((np.ones(N), (prob.creg, np.arange(N))), shape=(M, N))
+    # Σ_{c∈m} w_c y[c] >= req·N_m
+    G = sp.csr_matrix((w.astype(float), (creg, np.arange(N))), shape=(M, N))
     rows.append((sp.hstack([sp.csr_matrix((M, nx)), G]), (prob.req_cov + margin) * prob.Nm, np.inf))
     # Σ_k x[p,k] <= 1
     O = sp.kron(sp.identity(P), np.ones((1, K)))
@@ -48,7 +56,7 @@ def solve_milp(prob, time_limit=300, margin=0.0):
     sec = time.time() - t0
     x = np.rint(res.x[:nx]).reshape(P, K) if res.x is not None else np.zeros((P, K))
     return x, dict(sec=sec, status=int(res.status), message=res.message,
-                   gap=float(getattr(res, "mip_gap", np.nan) or 0.0), n_vars=int(n),
+                   gap=float(getattr(res, "mip_gap", np.nan) or 0.0), n_vars=int(n), cells=int(prob.N), merged_cells=int(N),
                    n_constraints=int(A.shape[0]))
 
 
