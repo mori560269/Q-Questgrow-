@@ -15,7 +15,8 @@
 | QUBO 2（ラグランジュ緩和・スラックなし） | 6,480 | +5.2% | 9 秒（修復なしで実行可能） |
 | QUBO 2 ＋修復 | 6,300 | +2.3% | |
 
-QUBO の数値はローカルの焼きなまし（neal）での結果です。Amplify AE では、QUBO 1 の生の解が 3 回中 2 回実行可能になり、最良 6,700（+8.8%）でした。
+QUBO の数値はローカルの焼きなまし（neal）での結果です。**Amplify AE** では、QUBO 1 の生の解が 3 回とも実行可能（最良 6,680、+8.4%）、
+QUBO 2 ＋修復が 6,380（+3.6%、206 秒）でした。AE でも、この課題では MILP（0.3 秒で最適）が速く、良い解を出します。
 QUBO は Amplify SDK で定式化しています（Amplify AE での実行は
 [Colab ノートブック](https://colab.research.google.com/github/mori560269/Q-Questgrow-/blob/claude/request-5v4fsc/placement/placement_amplify.ipynb)
 または `AMPLIFY_TOKEN=xxxx python placement/run_compare.py --backend amplify`）。
