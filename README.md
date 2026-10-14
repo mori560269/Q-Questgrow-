@@ -9,13 +9,14 @@
 
 | 手法 | コスト | 最適との差 | 時間 |
 |---|---|---|---|
-| MILP（HiGHS、厳密解） | **6,160** | 最適 | 3 秒 |
+| MILP（HiGHS、厳密解、200 m マス） | **6,160** | 最適 | 2.7 秒（100 m マスで数えても目標達成） |
 | 貪欲法 | 6,260 | +1.6% | 14 秒 |
 | QUBO 1（Amplify の制約・スラックあり）＋修復 | 6,580 | +6.8% | 11 秒（生の解は 5 回とも制約違反） |
 | QUBO 2（ラグランジュ緩和・スラックなし） | 6,480 | +5.2% | 9 秒（修復なしで実行可能） |
 | QUBO 2 ＋修復 | 6,300 | +2.3% | |
 
-QUBO は Amplify SDK で定式化し、この環境ではローカルの焼きなまし（neal）で解いています（Amplify AE での実行は
+QUBO の数値はローカルの焼きなまし（neal）での結果です。Amplify AE では、QUBO 1 の生の解が 3 回中 2 回実行可能になり、最良 6,700（+8.8%）でした。
+QUBO は Amplify SDK で定式化しています（Amplify AE での実行は
 [Colab ノートブック](https://colab.research.google.com/github/mori560269/Q-Questgrow-/blob/claude/request-5v4fsc/placement/placement_amplify.ipynb)
 または `AMPLIFY_TOKEN=xxxx python placement/run_compare.py --backend amplify`）。
 
