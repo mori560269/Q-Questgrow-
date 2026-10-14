@@ -55,7 +55,8 @@ def run_all(backend="neal", token=None, seeds=3, q1_sweeps=8000, q1_time_ms=1000
         rc = float((rx * prob.cost).sum())
         if rep_best is None or rc < rep_best[0]:
             rep_best = (rc, rx, time.time() - t)
-        log("QUBO1 seed", s, b["cost"], b["feasible"], "→ 修復", rc)
+        log("QUBO1 seed", s, b["cost"], b["feasible"], "→ 修復", rc,
+            "(AE: 収束前に時間切れ)" if sinfo.get("ae_timed_out") else "")
     q1note = f"変数 {binfo['n_x'] + binfo['n_y']}+スラック / {seeds} 回中 修復なしで実行可能 {raw_ok} 回"
     rows.append(_row(prob, "QUBO 1 (生の解)", np.array(raw_best["x"]), float(np.mean(secs)), opt, 備考=q1note))
     rows.append(_row(prob, "QUBO 1 + 修復", rep_best[1], float(np.mean(secs)) + rep_best[2], opt))
@@ -74,7 +75,9 @@ def run_all(backend="neal", token=None, seeds=3, q1_sweeps=8000, q1_time_ms=1000
         rc = float((rx * prob.cost).sum())
         if best_rep is None or rc < best_rep[0]:
             best_rep = (rc, rx, time.time() - t)
-        log("QUBO2 seed", s, None if best is None else best[0], "実行可能な反復", li["feasible_iters"], "→ 修復", rc)
+        log("QUBO2 seed", s, None if best is None else best[0], "実行可能な反復", li["feasible_iters"], "→ 修復", rc,
+            f"(AE: 時間切れ {li['ae_timeouts']} 回, 最後の制限時間 {li['ae_time_limit_ms_final']} ms)"
+            if backend == "amplify" else "")
     note = f"変数 {prob.P * prob.K} / 反復 {q2_iters} 回のうち実行可能 {feas_it}"
     if best_raw:
         rows.append(_row(prob, "QUBO 2 (生の解)", best_raw[1], float(np.mean(secs)), opt, 備考=note))
@@ -97,7 +100,7 @@ def equal_time(backend="neal", token=None, budgets=(1, 3, 10), seed=0, log=print
         rows.append(dict(時間の予算_秒=b, 手法="MILP", コスト=ev["cost"] if ev["feasible"] else None,
                          実行可能=ev["feasible"], 実際の時間=round(info["sec"], 2)))
         if backend == "amplify":
-            iters, kw = max(3, int(b / 0.6)), dict(time_limit_ms=500)       # AE: 1 回 0.5 秒 + 通信
+            iters, kw = max(3, int(b / 1.5)), dict(time_limit_ms=1000)      # AE: 1 回 1 秒 + 通信
         else:
             iters, kw = max(3, int(b / 0.04)), dict(num_sweeps=200)         # neal: 1 回 約 0.04 秒
         best, li = solve_lagrangian(prob, iters=iters, backend=backend, token=token, seed=seed, **kw)

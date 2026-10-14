@@ -27,14 +27,87 @@ placement/qubo_amplify.py : センサー配置を Fixstars Amplify で QUBO に�
     backend="amplify": Fixstars Amplify AE (トークンが必要)
     backend="neal"   : 同じ Amplify のモデルを Amplify で QUBO に変換し, ローカルの焼きなましで解く
 """
+import logging
 import os
 import time
+import warnings
 from datetime import timedelta
 import numpy as np
 from amplify import (VariableGenerator, Model, AmplifyAEClient, solve, greater_equal, less_equal,
                      AcceptableDegrees)
 
 from common import Problem
+
+
+# ======================================================================================
+# Amplify AE を安定して呼ぶための部品
+#
+#   - 「AE は制約の重みを自分で調整する」警告: AE の仕様どおりなので表示しない (重みは neal 用)
+#   - 「収束前に時間切れ」のログ: 表示せずに数え, QUBO 2 では次の回から制限時間を自動で延ばす
+#   - 通信の一時的な失敗: 2 秒, 4 秒 待って最大 3 回まで送り直す
+#   - トークンの誤り: 送り直さず, すぐに分かりやすいメッセージで止める
+# ======================================================================================
+AE_STATS = dict(calls=0, timeouts=0, retries=0)
+AE_MAX_TIME_MS = 5000
+
+
+class _AETimeLimitFilter(logging.Filter):
+    def filter(self, record):
+        if "time limit" in record.getMessage():
+            AE_STATS["timeouts"] += 1
+            return False                     # 数えるだけで表示しない
+        return True
+
+
+_amp_log = logging.getLogger("amplify")
+if not any(isinstance(f, _AETimeLimitFilter) for f in _amp_log.filters):
+    _amp_log.addFilter(_AETimeLimitFilter())
+
+
+def ae_client(token=None, time_limit_ms=1000):
+    token = (token or os.environ.get("AMPLIFY_TOKEN") or "").strip()
+    if not token:
+        raise RuntimeError("Amplify AE のトークンがありません. token 引数か 環境変数 AMPLIFY_TOKEN で渡してください")
+    client = AmplifyAEClient()
+    client.token = token
+    client.parameters.time_limit_ms = timedelta(milliseconds=int(time_limit_ms))
+    return client
+
+
+def _is_auth_error(e):
+    msg = str(e).lower()
+    return any(k in msg for k in ("401", "403", "unauthorized", "forbidden", "token", "authenticat"))
+
+
+def ae_solve(model, client, retries=3, **kw):
+    """amplify.solve を呼ぶ. 戻り値 (結果, この呼び出しで時間切れのログが出たか)"""
+    for attempt in range(retries):
+        before = AE_STATS["timeouts"]
+        try:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message=".*ignores the weight.*")
+                res = solve(model, client, **kw)
+            AE_STATS["calls"] += 1
+            return res, AE_STATS["timeouts"] > before
+        except Exception as e:
+            if _is_auth_error(e):
+                raise RuntimeError(f"Amplify AE にトークンを拒否されました. トークンを確かめてください ({e})") from e
+            if attempt == retries - 1:
+                raise RuntimeError(f"Amplify AE の呼び出しに {retries} 回失敗しました: {e}") from e
+            AE_STATS["retries"] += 1
+            time.sleep(2 * 2 ** attempt)
+
+
+def check_ae(token=None):
+    """小さな QUBO を AE で解いて, トークンと通信を確かめる. 失敗したら例外"""
+    gen = VariableGenerator()
+    q = gen.array("Binary", 4)
+    model = Model((q.sum() - 2) ** 2)
+    t0 = time.time()
+    res, _ = ae_solve(model, ae_client(token, 1000))
+    if len(res) == 0:
+        raise RuntimeError("Amplify AE から解が返ってきませんでした")
+    return dict(ok=True, sec=round(time.time() - t0, 2), energy=float(res.best.objective))
 
 
 def merged_cells(prob):
@@ -100,14 +173,11 @@ def solve_model(model, x, backend="neal", token=None, time_limit_ms=10000,
     """解を (P, K) の 0/1 配列のリスト (良い順) で返す"""
     t0 = time.time()
     if backend == "amplify":
-        client = AmplifyAEClient()
-        client.token = token or os.environ.get("AMPLIFY_TOKEN")
-        if not client.token:
-            raise RuntimeError("Amplify AE のトークンを token か 環境変数 AMPLIFY_TOKEN で渡してください")
-        client.parameters.time_limit_ms = timedelta(milliseconds=time_limit_ms)
-        result = solve(model, client, filter_solution=False)
+        result, timed_out = ae_solve(model, ae_client(token, time_limit_ms), filter_solution=False)
         sols = [np.rint(x.evaluate(s.values, 0.0)) for s in result]
-        info = dict(execution_sec=result.execution_time.total_seconds())
+        if not sols:
+            raise RuntimeError("Amplify AE から解が返ってきませんでした")
+        info = dict(execution_sec=result.execution_time.total_seconds(), ae_timed_out=timed_out)
     else:
         import dimod
         import neal
@@ -186,18 +256,17 @@ def lagrangian_qubo(prob, terms, mu, nu, rho, P_one=None):
 
 def solve_inner(lin, Q, backend="neal", token=None, time_limit_ms=1000, num_reads=10,
                 num_sweeps=1000, seed=0):
+    """解のリスト (良い順) と, AE が収束前に時間切れになったか を返す"""
     n = len(lin)
     if backend == "amplify":
         gen = VariableGenerator()
         m = gen.matrix("Binary", n)
         m.linear = lin
         m.quadratic = Q
-        client = AmplifyAEClient()
-        client.token = token or os.environ.get("AMPLIFY_TOKEN")
-        client.parameters.time_limit_ms = timedelta(milliseconds=time_limit_ms)
-        res = solve(m, client)
+        res, timed_out = ae_solve(m, ae_client(token, time_limit_ms))
         q = m.variable_array
-        return [np.rint(q.evaluate(s.values, 0.0)) for s in res]
+        sols = [np.rint(q.evaluate(s.values, 0.0)) for s in res]
+        return (sols or [np.zeros(n)]), timed_out
     import dimod
     import neal
     r, c = np.nonzero(Q)
@@ -207,7 +276,7 @@ def solve_inner(lin, Q, backend="neal", token=None, time_limit_ms=1000, num_read
     order = np.argsort(ss.record.energy)
     var_index = {v: i for i, v in enumerate(ss.variables)}
     perm = np.array([var_index[v] for v in range(n)])
-    return [ss.record.sample[i][perm].astype(float) for i in order]
+    return [ss.record.sample[i][perm].astype(float) for i in order], False
 
 
 def solve_lagrangian(prob, iters=40, eta=1.0, backend="neal", token=None, time_limit_ms=1000,
@@ -222,9 +291,13 @@ def solve_lagrangian(prob, iters=40, eta=1.0, backend="neal", token=None, time_l
     rho = np.full(M, 15.0)                         # β 1 の値段
     best, history, n_feasible = None, [], 0
     least = None                                   # 実行可能な解が無いとき用: 不足が最も少ない解
+    tl, n_timeout = time_limit_ms, 0               # AE の制限時間 (時間切れなら次から 2 倍, 上限 5 秒)
     for it in range(iters):
         lin, Q = lagrangian_qubo(prob, terms, mu, nu, rho)
-        sols = solve_inner(lin, Q, backend, token, time_limit_ms, num_reads, num_sweeps, seed + it)
+        sols, timed_out = solve_inner(lin, Q, backend, token, tl, num_reads, num_sweeps, seed + it)
+        if timed_out:
+            n_timeout += 1
+            tl = min(tl * 2, AE_MAX_TIME_MS)
         x = sols[0].reshape(prob.P, prob.K)
         xi = x.reshape(-1).astype(bool)
         covered = prob.cover[:, xi].any(1)
@@ -256,6 +329,6 @@ def solve_lagrangian(prob, iters=40, eta=1.0, backend="neal", token=None, time_l
         nu *= np.exp(step * np.where(g_a > 0, g_a * 3, g_a * 0.5))
         rho *= np.exp(step * np.where(g_b > 0, g_b * 3, g_b * 0.5))
     return best, dict(sec=time.time() - t0, iters=iters, feasible_iters=n_feasible, history=history,
-                      least_violating_x=least[1],
+                      least_violating_x=least[1], ae_timeouts=n_timeout, ae_time_limit_ms_final=tl,
                       n_vars=prob.P * prob.K, final_mu=mu.round(3).tolist(),
                       final_nu=nu.round(2).tolist(), final_rho=rho.round(2).tolist())
