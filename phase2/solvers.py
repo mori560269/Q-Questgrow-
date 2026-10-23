@@ -78,11 +78,14 @@ def _covered(I, plan):
 
 
 # ---------------------------------------------------------------- (A) 貪欲法
-def greedy(I, ev=None):
+def greedy(I, ev=None, deadline=None):
+    """deadline (time.time() の値) を過ぎたら, その時点までの計画を返す（全部は回復しないこともある）"""
     ev = ev or Evaluator(I)
     plan = {t.tid: [] for t in I.trucks}
     todo = set(I.recoverable)
     while todo:
+        if deadline is not None and time.time() > deadline:
+            break
         best = None
         cur = ev.key(plan)
         for fi, f in enumerate(I.flights):
@@ -306,7 +309,7 @@ def solve_columns(I, max_flights=3, time_limit=120.0):
     integ = np.r_[np.ones(nC), 0]
     ub = np.r_[np.ones(nC), np.inf]
     res = milp(c, constraints=LinearConstraint(A, lo, hi), integrality=integ, bounds=Bounds(0, ub),
-               options=dict(time_limit=max(5.0, time_limit - (time.time() - t0)), disp=False))
+               options=dict(time_limit=max(0.1, time_limit - (time.time() - t0)), disp=False))
     plan = {t.tid: [] for t in I.trucks}
     if res.x is not None:
         for ci in np.nonzero(np.rint(res.x[:nC]))[0]:
