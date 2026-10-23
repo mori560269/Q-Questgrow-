@@ -18,6 +18,7 @@ from model import Instance, Truck
 from world import make_scenario
 import solvers as S
 from dynamic import run_dynamic, reveal_schedule
+from qubo_bisect import solve_qubo_bisect
 
 ROOT = os.path.join(HERE, "..")
 RES = os.path.join(ROOT, "results")
@@ -69,8 +70,27 @@ def compare(I, seeds=3, qubo_reads=20, qubo_sweeps=2000, backend="neal", token=N
     rows.append(r); evs["qubo_raw"] = e; log(r)
     r, e = row(I, "QUBO + 修復 + 局所探索", best_ls[0], float(np.mean(secs)) + best_ls[2]); rows.append(r)
     evs["qubo_ls"] = e; log(r)
+    # 上限 T の二分探索 + 判定 QUBO（qubo_bisect.py）
+    best_b, best_bls, secs = None, None, []
+    for s in range(seeds):
+        p, t, info = solve_qubo_bisect(I, backend=backend, token=token, num_reads=qubo_reads,
+                                       num_sweeps=qubo_sweeps, seed=s)
+        secs.append(t)
+        e = I.evaluate(p)
+        if best_b is None or S._key(e) < S._key(best_b[1]):
+            best_b = (p, e, info)
+        t2 = time.time()
+        q = S.local_search(I, p, 10)
+        e2 = I.evaluate(q)
+        if best_bls is None or S._key(e2) < S._key(best_bls[1]):
+            best_bls = (q, e2, time.time() - t2)
+    r, e = row(I, "QUBO 二分探索（生の解）", best_b[0], float(np.mean(secs)),
+               備考=f"QUBO を解いた回数 {best_b[2]['iters'] + 1}")
+    rows.append(r); evs["qubo_bisect"] = e; log(r)
+    r, e = row(I, "QUBO 二分探索 + 局所探索", best_bls[0], float(np.mean(secs)) + best_bls[2]); rows.append(r)
+    evs["qubo_bisect_ls"] = e; log(r)
     lb = I.lower_bound()
-    opt = evs["exact"]["makespan"]
+    opt = evs["exact"]["makespan"] if evs["exact"]["recovered"] == evs["exact"]["recoverable"] else None
     for r in rows:
         r["厳密解との差"] = f"{(r['完了時刻_分'] - opt) / opt:+.1%}" if opt else None
     return rows, evs, lb
