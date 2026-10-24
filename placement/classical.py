@@ -21,7 +21,8 @@ import scipy.sparse as sp
 from scipy.optimize import milp, LinearConstraint, Bounds
 
 
-def solve_milp(prob, time_limit=300, margin=0.0):
+def solve_milp(prob, time_limit=300, margin=0.0, obj=None, cost_cap=None):
+    """obj: 目的を総コストの代わりに使うベクトル（長さ P*K）. cost_cap: 総コストの上限（制約として足す）"""
     P, K, M = prob.P, prob.K, prob.M
     nx = P * K
     # 覆えるセンサーの組が同じマスをまとめる (市町村ごと). w = まとめたマスの数
@@ -31,8 +32,10 @@ def solve_milp(prob, time_limit=300, margin=0.0):
     N = len(first)
     creg, cover = prob.creg[first], prob.cover[first]
     n = nx + N
-    c = np.r_[np.tile(prob.cost, P), np.zeros(N)]
+    c = np.r_[np.tile(prob.cost, P) if obj is None else np.asarray(obj, float), np.zeros(N)]
     rows = []
+    if cost_cap is not None:
+        rows.append((sp.csr_matrix(np.r_[np.tile(prob.cost, P), np.zeros(N)][None, :]), -np.inf, cost_cap))
     # y[c] - Σ cover x <= 0
     cov = sp.csr_matrix(cover.astype(float))
     A1 = sp.hstack([-cov, sp.identity(N)])

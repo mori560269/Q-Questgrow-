@@ -34,7 +34,11 @@ def _rec_last(f):
     return max(f["offset"])
 
 
-def build_decision_qubo(I, T_lim, eps_total=0.3):
+def build_decision_qubo(I, T_lim, eps_total=0.3, sum_weight=0.0):
+    """sum_weight > 0 なら「回復時刻の合計を最小（早く回復するほど良い）」を目的に足す:
+         Σ (枠の開始の下界 + 各センサーまでの時間) y          … 1 次
+       + Σ (前の飛行のせいで遅れる分 × 回るセンサー数) y y'   … 連続する 2 つの飛行の 2 次
+       係数は, 1 変数あたりの最大値が sum_weight（< 被覆の罰金 2）になるようにそろえる"""
     F = len(I.flights)
 
     var = []                                   # (f, ti, k, 開始の下界)
@@ -92,6 +96,7 @@ def build_decision_qubo(I, T_lim, eps_total=0.3):
     # 「詰める」の −u[k−1]u[k] は, 1 枠に複数入ると際限なく負になる. W_ONE ≥ 3 なら
     # 各枠の W_ONE·a(a−1)/2 が隣の枠との −a·b を上回り, エネルギーが下に抜けない.
     W_COV, W_ONE, W_TIME = 2.0, 3.0, 2.0
+    delays = []
     for j, mem in cov.items():                                        # ちょうど 1 回
         for a in mem:
             lin[a] += -W_COV
@@ -111,7 +116,7 @@ def build_decision_qubo(I, T_lim, eps_total=0.3):
                 lin[g] += 1.0
                 for f in prev:
                     q(f, g, -1.0)
-            # 連続する 2 つの飛行が T に間に合わない組に罰金
+            # 連続する 2 つの飛行が T に間に合わない組に罰金（目的が「合計」なら遅れの分も足す）
             for f in prev:
                 fi, _, _, stf = var[f]
                 Ff = I.flights[fi]
@@ -125,8 +130,18 @@ def build_decision_qubo(I, T_lim, eps_total=0.3):
                     start_g = max(end_f + dv, end_f + CHARGE_MIN, stg)
                     if start_g + _rec_last(Fg) > T_lim + 1e-9:
                         q(f, g, W_TIME)
+                    elif sum_weight > 0:
+                        delays.append((f, g, (start_g - stg) * len(Fg["sensors"])))
     est = np.array([st + _rec_last(I.flights[fi]) for (fi, ti, k, st) in var])
-    lin += eps_total * est / (est.sum() + 1e-9)                       # 同点なら早い方（罰金 1 より十分小さい）
+    if sum_weight > 0:
+        cost = np.array([sum(st + o for o in I.flights[fi]["offset"]) for (fi, ti, k, st) in var])
+        scale = sum_weight / max(cost.max(), max((d for _, _, d in delays), default=0.0), 1e-9)
+        lin += scale * cost
+        for f, g, d in delays:
+            if d > 0:
+                q(f, g, scale * d)
+    else:
+        lin += eps_total * est / (est.sum() + 1e-9)                   # 同点なら早い方（罰金 1 より十分小さい）
     return dict(lin=lin, Q=Q, var=var, n=n)
 
 
@@ -192,3 +207,43 @@ def solve_qubo_bisect(I, backend="neal", token=None, num_reads=20, num_sweeps=20
         if log:
             log(hist[-1])
     return best_plan, time.time() - t0, dict(history=hist, iters=it, lower=round(lo, 1), upper=round(hi, 1))
+
+
+def solve_qubo_sum_timed(I, budget, seed=0, chunk=(8, 2000), sum_weight=1.8, start_factor=1.35):
+    """「早く回復するほど良い」の QUBO を, 時間の予算いっぱい解く.
+    上限 T は下界の 1.35 倍から始め, 解が見つからなければ 25% ずつゆるめ, 見つかればその完了時刻まで締める.
+    （T がゆるいと変数が増えて解の質が落ちる: サンプルで T=230 → 1,242 変数, T=140 → 594 変数）
+    sum_weight = 目的の係数の最大値. 被覆の罰金 2 より小さければ, センサーを外して得をすることはない"""
+    from qubo_amplify import solve_inner
+    t_end = time.time() + budget
+    ev = S.Evaluator(I, "sum")
+    T_lim = I.lower_bound() * start_factor
+    best, bkey, it, miss = None, None, 0, 0
+    model, model_T = None, None
+    while True:
+        if time.time() >= t_end and (best is not None or time.time() >= t_end + budget):
+            break
+        if model is None or model_T != T_lim:
+            model = build_decision_qubo(I, T_lim, sum_weight=sum_weight)
+            model_T = T_lim
+            if model is None:
+                T_lim *= 1.25
+                continue
+        sols, _ = solve_inner(model["lin"], model["Q"], "neal", None, 1000, chunk[0], chunk[1], seed * 1000 + it)
+        it += 1
+        got = False
+        for s_ in sols:
+            plan, exact = decode(I, model["var"], s_)
+            if not exact:
+                continue
+            got = True
+            k = ev.key(plan)
+            if bkey is None or k < bkey:
+                best, bkey = plan, k
+        if best is not None:
+            e = I.evaluate(best)
+            if e["feasible"] and e["makespan"] < T_lim - 1e-6:
+                T_lim = e["makespan"] + 1e-6
+        if not got and best is None:
+            T_lim *= 1.25
+    return best
