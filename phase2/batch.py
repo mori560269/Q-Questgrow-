@@ -199,11 +199,23 @@ def stats():
             base = {(r["問題"], r["判明の順番"]): r for r in sub if r["手法"] == ref}
             for m in LD.METHODS:
                 rs = [r for r in sub if r["手法"] == m and (r["問題"], r["判明の順番"]) in base]
-                d = [r["平均回復時刻"] - base[(r["問題"], r["判明の順番"])]["平均回復時刻"] for r in rs]
+                # 勝ち負けは辞書式: 回復できた数が多い方が勝ち, 同じなら平均回復時刻が早い方
+                # 時刻の差は回復数が同じ組だけで平均する（回復数が少ない方が平均時刻は早く見えるため）
+                def cmp(r):
+                    b = base[(r["問題"], r["判明の順番"])]
+                    if r["回復数"] != b["回復数"]:
+                        return -1 if r["回復数"] > b["回復数"] else 1
+                    x = r["平均回復時刻"] - b["平均回復時刻"]
+                    return -1 if x < -0.05 else (1 if x > 0.05 else 0)
+                same = [r for r in rs if r["回復数"] == base[(r["問題"], r["判明の順番"])]["回復数"]]
+                d = [r["平均回復時刻"] - base[(r["問題"], r["判明の順番"])]["平均回復時刻"] for r in same]
+                drec = [r["回復数"] - base[(r["問題"], r["判明の順番"])]["回復数"] for r in rs]
                 full = [r["回復数"] == r["通信断"] for r in rs]
-                w_ = sum(x < -0.05 for x in d); l_ = sum(x > 0.05 for x in d)
+                c = [cmp(r) for r in rs]
+                w_ = sum(x < 0 for x in c); l_ = sum(x > 0 for x in c)
                 out.append(dict(通信断=size, 手法=m, 回数=len(rs),
                                 平均回復時刻=round(float(np.mean([r["平均回復時刻"] for r in rs])), 2) if rs else None,
+                                回復数の差_平均=round(float(np.mean(drec)), 2) if rs else None, 回復数が同じ組=len(same),
                                 古典との差_分=round(float(np.mean(d)), 2) if d else None, 差の95CI=boot_ci(d),
                                 全基回復の割合=round(float(np.mean(full)), 3) if rs else None,
                                 古典に勝ち=int(w_), 負け=int(l_), 符号検定p=sign_test(int(w_), int(l_)) if m != ref else None,
