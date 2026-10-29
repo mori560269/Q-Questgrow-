@@ -1,0 +1,24 @@
+{
+  "name": "TEDxQuestgrow 2026",
+  "short_name": "TEDxQuestgrow",
+  "description": "TEDxQuestgrow 2026 公式アプリ：予約・会場マップ・交流・AIコンシェルジュ",
+  "lang": "ja",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0d1a",
+  "theme_color": "#0b0d1a",
+  "categories": ["events", "social"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "マイプラン・チケット", "short_name": "チケット", "url": "/plan", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "会場マップ", "short_name": "マップ", "url": "/map", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "AIコンシェルジュ", "short_name": "AIに聞く", "url": "/assistant", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

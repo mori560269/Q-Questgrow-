@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Icon, type IconName } from "./components/Icon";
+import { PwaStatus } from "./components/PwaBanners";
 import { Toaster } from "./components/Toast";
 import { useStore } from "./lib/store";
 import { AssistantPage } from "./pages/Assistant";
@@ -37,6 +38,7 @@ export function App() {
   return (
     <div className="app">
       <Toaster />
+      <PwaStatus />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/programs" element={<ProgramsPage />} />

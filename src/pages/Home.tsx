@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Avatar } from "../components/Avatar";
 import { Icon } from "../components/Icon";
+import { InstallCard } from "../components/PwaBanners";
 import { KIND_COLOR, SessionCard } from "../components/SessionCard";
 import { EVENT, KIND_LABEL, SESSIONS, SPEAKERS, ZONES } from "../data/event";
 import { effective, liveState, myBookings, nowMinutes, useStore } from "../lib/store";
@@ -74,6 +75,8 @@ export function HomePage() {
             </Link>
           </div>
         </div>
+
+        <InstallCard />
 
         {latest && (
           <Link to="/notices" className={`banner ${latest.level}`} style={{ marginTop: 14 }}>

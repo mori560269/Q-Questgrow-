@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="r" cx="85%" cy="0%" r="90%"><stop offset="0" stop-color="#e62b1e" stop-opacity=".75"/><stop offset="1" stop-color="#e62b1e" stop-opacity="0"/></radialGradient>
+    <radialGradient id="b" cx="0%" cy="25%" r="80%"><stop offset="0" stop-color="#506eff" stop-opacity=".55"/><stop offset="1" stop-color="#506eff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b0d1a"/><stop offset=".6" stop-color="#141a3a"/><stop offset="1" stop-color="#232c66"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#g)"/>
+  <rect width="512" height="512" fill="url(#b)"/>
+  <rect width="512" height="512" fill="url(#r)"/>
+  <g id="c">
+  <text x="256" y="300" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="150" fill="#fff" letter-spacing="-4">TED<tspan fill="#e62b1e">x</tspan></text>
+  <path d="M256 360l10 26 26 10-26 10-10 26-10-26-26-10 26-10z" fill="#fff" opacity=".9"/>
+  </g>
+</svg>
