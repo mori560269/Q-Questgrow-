@@ -99,10 +99,13 @@ def repair_ils(J, budget, seed, cur_ms):
     return ils(J, budget, seed)
 
 
+REDUCE = False          # True: 離陸地点が違うだけの列をまとめてから解く（exact.reduce_columns）
+
+
 def repair_colqubo(J, budget, seed, cur_ms, start=None):
     """部分問題の列（完了時刻 ≤ 今の値）を列挙し, 集合分割 QUBO の二分探索で選ぶ"""
     from exact import solve_column_qubo
-    p, info = solve_column_qubo(J, budget, seed, UB=cur_ms + 1e-6, start=start, chunk=(8, 1000))
+    p, info = solve_column_qubo(J, budget, seed, UB=cur_ms + 1e-6, start=start, chunk=(8, 1000), reduce=REDUCE)
     return p
 
 

@@ -6,7 +6,7 @@ phase2/real_batch.py : 実データの道路網で, サンプルと同等〜よ�
 
   1. 基準: 厳密解法（exact.solve_exact. 反復局所探索 10 秒の解を上限に, 列挙 + MILP の二分探索, 最大 300 秒）
            と 枠割当の下界（real.slot_lower_bound）
-  2. 同じ計算時間（5 秒・30 秒, 乱数の種 2 つ）で 7 手法
+  2. 同じ計算時間（5 秒は乱数の種 2 つ, 30 秒は 1 つ）で 7 手法
        古典: 貪欲法 + 局所探索 / 反復局所探索 / 厳密解法（時間内）/ LNS（予算の 30% の反復局所探索から, 部分問題を列の MILP で）
        QUBO: 時間枠の判定 QUBO 二分探索（生の解）/ 列の集合分割 QUBO（列の列挙は古典）/ LNS（同じ初期解から, 部分問題を列の QUBO で）
 
@@ -187,7 +187,8 @@ def run_equal(procs=3):
         pid = f"{name}_{k}"
         for B in BUDGETS:
             for m in METHODS:
-                for sd in (SEEDS[:1] if m in DETERMINISTIC else SEEDS):
+                # 30 秒の予算は乱数の種 1 つだけ（計算時間の都合. 5 秒は 2 つ）
+                for sd in (SEEDS[:1] if m in DETERMINISTIC or B >= 30 else SEEDS):
                     if (pid, m, B, sd) not in done:
                         tasks.append((pid, sc, m, B, sd))
     print(len(tasks), "件", flush=True)

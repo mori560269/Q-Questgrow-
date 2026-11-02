@@ -69,6 +69,17 @@ def enumerate_columns(I, UB, time_limit=600.0, max_cols=2_000_000):
     return out, truncated
 
 
+def reduce_columns(I, cols):
+    """同じ拠点・同じセンサーの組・同じ予備の要否の列は, 完了時刻が最短のものだけ残す（離陸地点が違うだけの列）.
+    判定問題「完了時刻 ≤ T の列で集合分割できるか」の答えは変わらない（最短の列は, 残した列より T に間に合いやすい）"""
+    best = {}
+    for c in cols:
+        k = (c[0], frozenset(j for f in c[1] for j in I.flights[f]["sensors"]), c[3])
+        if k not in best or c[2] < best[k][2]:
+            best[k] = c
+    return list(best.values())
+
+
 def _milp_feasible(I, cols, classes, T, J, maximize_cover=False, time_limit=60.0):
     idx = [i for i, c in enumerate(cols) if c[2] <= T + 1e-9]
     n = len(idx)
@@ -100,7 +111,7 @@ def _milp_feasible(I, cols, classes, T, J, maximize_cover=False, time_limit=60.0
     return chosen
 
 
-def solve_exact(I, UB=None, start=None, time_limit=600.0, log=None):
+def solve_exact(I, UB=None, start=None, time_limit=600.0, log=None, reduce=False):
     """戻り値: plan, info（最適か・下界・列の数・時間）"""
     t0 = time.time()
     J = list(I.recoverable)
@@ -114,6 +125,8 @@ def solve_exact(I, UB=None, start=None, time_limit=600.0, log=None):
     UB = e0["makespan"] if UB is None else UB
     classes = truck_classes(I)
     cols, truncated = enumerate_columns(I, UB, time_limit=time_limit * 0.6)
+    if reduce:
+        cols = reduce_columns(I, cols)
     if log:
         log(dict(列=len(cols), 打ち切り=truncated, 秒=round(time.time() - t0, 1)))
     # 空の組（その車は使わない）
@@ -292,7 +305,7 @@ def _build_column_qubo_per_truck(I, cols, classes, T, J, eps_total=0.3):
     return dict(lin=lin, Q=Q, var=var, nX=n, n=nn, per_truck=True)
 
 
-def solve_column_qubo(I, budget, seed=0, UB=None, start=None, cols=None, chunk=(16, 2000), log=None):
+def solve_column_qubo(I, budget, seed=0, UB=None, start=None, cols=None, chunk=(16, 2000), log=None, reduce=False):
     """列の列挙（古典の前処理, MILP と共通）+ 集合分割 QUBO の二分探索（焼きなまし）.
     戻り値: plan, info"""
     from qubo_amplify import solve_inner
@@ -307,6 +320,8 @@ def solve_column_qubo(I, budget, seed=0, UB=None, start=None, cols=None, chunk=(
     UB = e0["makespan"] if UB is None else UB
     if cols is None:
         cols, truncated = enumerate_columns(I, UB, time_limit=budget * 0.5)
+    if reduce:
+        cols = reduce_columns(I, cols)
     t_enum = time.time() - t0
     vals = sorted({c[2] for c in cols if c[1]})
     LB = I.lower_bound()
