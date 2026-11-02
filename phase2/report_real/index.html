@@ -1,0 +1,430 @@
+<title>Phase 2 実データの結果</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+/* layout: 1 本の読み物の列（最大 880px）。地図と図は列いっぱい、表は横スクロール。災害対応の報告書らしく、地図の紙色と信号色だけで組む */
+:root {
+  --paper: #f5f7f6;      /* 地図の紙 */
+  --panel: #ffffff;
+  --ink: #16232a;        /* スレート */
+  --muted: #55636a;
+  --rule: #d5dcda;
+  --signal: #c2410c;     /* 通信断・注意 */
+  --classic: #eb6834;    /* 古典 */
+  --qubo: #2a78d6;       /* QUBO */
+  --exact: #16232a;      /* 厳密解・基準 */
+  --old: #a3adb1;        /* 以前の QUBO（比較の基準） */
+  --ms: #6250d6;         /* 目的: 最後の回復時刻 */
+  --sum: #1baf7a;        /* 目的: 回復時刻の合計 */
+  --best-bg: #e6f2ec;
+  --f-display: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12191c; --panel: #1a2327; --ink: #e6ecea; --muted: #a7b3b1; --rule: #2f3b40;
+    --signal: #f08a4b; --classic: #d95926; --qubo: #3987e5; --exact: #e6ecea; --old: #66737a;
+    --ms: #9085e9; --sum: #199e70; --best-bg: #1d3329; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12191c; --panel: #1a2327; --ink: #e6ecea; --muted: #a7b3b1; --rule: #2f3b40;
+  --signal: #f08a4b; --classic: #d95926; --qubo: #3987e5; --exact: #e6ecea; --old: #66737a;
+  --ms: #9085e9; --sum: #199e70; --best-bg: #1d3329; color-scheme: dark;
+}
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 16px; line-height: 1.8; }
+.wrap { max-width: 880px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 56px; }
+header { display: flex; flex-direction: column; gap: 14px; }
+.eyebrow { font-size: 13px; letter-spacing: .12em; color: var(--muted); }
+h1 { font-family: var(--f-display); font-weight: 900; font-size: clamp(30px, 5vw, 44px); line-height: 1.25; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--f-display); font-weight: 700; font-size: 25px; line-height: 1.35; margin: 0; text-wrap: balance; }
+h3 { font-size: 17px; margin: 0; }
+p { margin: 0; max-width: 40em; }
+section { display: flex; flex-direction: column; gap: 18px; }
+.note { border: 1px solid var(--signal); color: var(--ink); background: var(--panel); border-radius: 6px; padding: 12px 16px; font-size: 14px; }
+.note b { color: var(--signal); }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.facts div { background: var(--panel); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.facts b { font-family: var(--f-display); font-size: 28px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.facts span { font-size: 13px; color: var(--muted); }
+ol.findings { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 10px; max-width: 42em; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+figure img { width: 100%; height: auto; border: 1px solid var(--rule); border-radius: 6px; background: #fff; }
+.cap, figcaption { font-size: 13px; color: var(--muted); max-width: 52em; }
+.chart { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 12px; overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 620px; height: auto; font-family: var(--f-body); }
+.grid { stroke: var(--rule); stroke-width: 1; }
+.tick { fill: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.lab { fill: var(--ink); font-size: 13px; }
+.val { fill: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+.val.small { font-size: 12px; }
+.refl { fill: var(--muted); font-size: 12px; }
+.ref-opt { stroke: var(--exact); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.ref-lb { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.ln { fill: none; stroke-width: 2; } .ln.classic { stroke: var(--classic); } .ln.hybrid { stroke: var(--sum); } .ln.qubo { stroke: var(--qubo); } .ln.old { stroke: var(--old); }
+.pt { stroke: var(--panel); stroke-width: 2; } .pt.classic { fill: var(--classic); } .pt.hybrid { fill: var(--sum); } .pt.qubo { fill: var(--qubo); } .pt.old { fill: var(--old); }
+.sw.hybrid { background: var(--sum); }
+.err { stroke-width: 2; opacity: .55; } .err.classic { stroke: var(--classic); } .err.hybrid { stroke: var(--sum); } .err.qubo { stroke: var(--qubo); }
+.band { stroke: none; opacity: .18; } .band.classic { fill: var(--classic); } .band.qubo { fill: var(--qubo); }
+.bar.classic { fill: var(--classic); } .bar.qubo { fill: var(--qubo); } .bar.exact { fill: var(--exact); } .bar.old { fill: var(--old); }
+.range { stroke-width: 2; } .range.ms { stroke: var(--ms); } .range.sum { stroke: var(--sum); } .range.exact { stroke: var(--exact); }
+.dot { stroke: var(--panel); stroke-width: 2; } .dot.ms { fill: var(--ms); } .dot.sum { fill: var(--sum); } .dot.exact { fill: var(--exact); }
+.worst.ms { fill: var(--ms); } .worst.sum { fill: var(--sum); } .worst.exact { fill: var(--exact); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.sw.classic { background: var(--classic); } .sw.qubo { background: var(--qubo); } .sw.exact { background: var(--exact); }
+.sw.old { background: var(--old); } .sw.ms { background: var(--ms); } .sw.sum { background: var(--sum); }
+.tbl { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 12px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+thead th { font-size: 12px; color: var(--muted); font-weight: 700; text-align: right; vertical-align: bottom; white-space: normal; min-width: 5.5em; }
+tbody th { text-align: left; font-weight: 400; }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+td small { display: block; font-size: 11px; color: var(--muted); }
+td.best { background: var(--best-bg); font-weight: 700; }
+td.na { color: var(--muted); }
+td.lb { color: var(--muted); }
+.formula { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 13.5px; line-height: 1.7; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; overflow-x: auto; white-space: pre; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.two > div { min-width: 0; background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+@media (max-width: 640px) { .two { grid-template-columns: 1fr; } }
+a { color: var(--qubo); }
+footer { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+</style>
+<style>
+.val.inbar { fill: #fff; font-weight: 700; }
+.whisk { stroke: var(--ink); stroke-width: 1.5; opacity: .6; }
+.val.warn { fill: var(--signal); font-weight: 700; }
+.seg.ok, .sw.ok { fill: var(--sum); background: var(--sum); }
+.seg.subopt, .sw.subopt { fill: var(--qubo); background: var(--qubo); opacity: .55; }
+.seg.fail, .sw.fail { fill: var(--old); background: var(--old); }
+.stem { stroke: var(--rule); stroke-width: 3; }
+.dot2 { stroke: var(--panel); stroke-width: 2; }
+.dot2.better, .sw.better { fill: var(--sum); background: var(--sum); }
+.dot2.worse, .sw.worse { fill: var(--signal); background: var(--signal); }
+.dot2.same, .sw.same { fill: var(--old); background: var(--old); }
+.abar { fill: var(--old); } .abar.cur { fill: var(--exact); } .abar.alt { fill: var(--sum); }
+.facts { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Q-Quest GROW ／ 国際航業 新緑県 広域観測網の最適化問題 ／ Phase 2</div>
+  <h1>配布データで解いた、災害時のドローン中継計画</h1>
+  <p>配布された道路網（道路区間 1,682・ノード 1,597）とサンプル災害で、通信が止まったセンサーをドック搭載車とドローンで回復する計画を求めました。サンプルは厳密に最適を証明し、サンプルと同等〜より複雑な災害 50 問を作って、古典の手法と QUBO を同じ計算時間で比べています。</p>
+  <div class="note"><b>QUBO の解き方について。</b>この環境からは Amplify AE に接続できないため、QUBO はすべて CPU の焼きなまし（neal）で解いています。Amplify AE で解くと結果が変わる可能性があります。</div>
+</header>
+
+<section>
+  <h2>わかったこと</h2>
+  <ol class="findings">
+    <li><b>配布サンプルの最適な完了時刻は 130.08 分</b>（厳密解法で証明、0.2 秒）。通信断 18 基のうち 4 基は、通行止めで届く離陸地点に行けず対応不能で、課題資料と一致しました。</li>
+    <li><b>サンプルと同じくらいの規模なら、厳密解法で最適が数秒で求まります。</b>A〜C 系統とサンプルの 31 問中 28 問で最適を証明しました。</li>
+    <li><b>大規模な災害（D・E）では、古典の反復局所探索が最も良い計画を出しました。</b>30 秒の予算で、全 51 問の平均で最良との差 +0.9%。</li>
+    <li><b>QUBO の成否は変数の数で決まります。</b>厳密解法と同じ列を QUBO にすると、列が 100 未満ならほぼ最適、1,000 を超えると制約を満たす解すら出ません。QUBO を活かすなら、大きい問題を小さく切った部分問題（LNS）に使うのが現実的です（最良との差 +3.6%、MILP で同じことをすると +3.15%）。</li>
+    <li><b>平常時の備えとしては、どの拠点に車を置くかが効きます。</b>サンプルでは北東町役場に車を 2 台足すと 30 分早くなります。8 台の分け方は現状の 4・2・2 が平均でほぼ最良で、最悪の災害に備えるなら 4・1・3 です。</li>
+  </ol>
+</section>
+
+<section>
+  <h2>配布サンプルの最適計画</h2>
+  <div class="facts">
+    <div><b>18</b><span>通信断センサー</span></div>
+    <div><b>4</b><span>対応不能（通行止めで行けない）</span></div>
+    <div><b>130.08</b><span>最適な完了時刻 [分]</span></div>
+    <div><b>126.29</b><span>下界 [分]（差 3%）</span></div>
+    <div><b>90.87</b><span>平均回復時刻 [分]</span></div>
+  </div>
+  <figure>
+    <img src="real_sample_map.png" alt="配布サンプルの最適計画の地図。通行止め区間、通信断センサーと回復時刻、対応不能の 4 基、車ごとの経路と離陸地点" width="792" height="874">
+    <figcaption>赤い太線が通行止め区間、赤い × が対応不能の 4 基（P07_1・P07_5・P07_7・P07_9）。色つきの線が車ごとの経路、三角が離陸地点、点線がドローンの飛行。センサーの横の数字は回復した時刻 [分]。</figcaption>
+  </figure>
+  <figure>
+    <img src="real_sample_gantt.png" alt="車ごとの行動の時間割。走行、離陸準備、飛行、充電待ち" width="906" height="553">
+    <figcaption>車ごとの行動。時間の大半は走行（一般道 20 km/h と通行止めの迂回）で、充電待ちは 2 台だけ。赤い破線が完了時刻 130.08 分。</figcaption>
+  </figure>
+  <p>センサーどうしは最も近くて 2,978 m 離れているため、2 基以上を 1 回の飛行で回ることはできず、飛行はすべて 1 基ずつです。予備バッテリーは使いません（どの車も 5 回以内）。</p>
+</section>
+
+<section>
+  <h2>何を変えると早くなるか</h2>
+  <p>サンプルで条件を 1 つずつ変え、それぞれ厳密解法で最適な完了時刻を求めました（破線が現状の 130.1 分）。</p>
+  <div class="legend"><span class="key"><i class="sw better"></i>早くなる</span><span class="key"><i class="sw worse"></i>遅くなる</span><span class="key"><i class="sw same"></i>変わらない</span></div>
+  <div class="chart"><svg viewBox="0 0 760 492" role="img" aria-label="条件を変えたときの最適な完了時刻">
+<line class="grid" x1="250.0" x2="250.0" y1="10" y2="466"/><text class="tick" x="250.0" y="484" text-anchor="middle">80</text>
+<line class="grid" x1="317.7" x2="317.7" y1="10" y2="466"/><text class="tick" x="317.7" y="484" text-anchor="middle">90</text>
+<line class="grid" x1="385.4" x2="385.4" y1="10" y2="466"/><text class="tick" x="385.4" y="484" text-anchor="middle">100</text>
+<line class="grid" x1="453.1" x2="453.1" y1="10" y2="466"/><text class="tick" x="453.1" y="484" text-anchor="middle">110</text>
+<line class="grid" x1="520.8" x2="520.8" y1="10" y2="466"/><text class="tick" x="520.8" y="484" text-anchor="middle">120</text>
+<line class="grid" x1="588.5" x2="588.5" y1="10" y2="466"/><text class="tick" x="588.5" y="484" text-anchor="middle">130</text>
+<line class="grid" x1="656.2" x2="656.2" y1="10" y2="466"/><text class="tick" x="656.2" y="484" text-anchor="middle">140</text>
+<line class="ref-opt" x1="589.1" x2="589.1" y1="10" y2="466"/>
+<text class="lab" x="240" y="28" text-anchor="end">基準（配布サンプル）</text>
+<line class="stem" x1="589.1" x2="589.1" y1="24" y2="24"/>
+<circle class="dot2 same" cx="589.1" cy="24" r="5.5"><title>基準（配布サンプル）: 130.1 分</title></circle>
+<text class="val small" x="599.1" y="28">130.1</text>
+<text class="lab" x="240" y="56" text-anchor="end">予備バッテリーの数: 0</text>
+<line class="stem" x1="589.1" x2="589.1" y1="52" y2="52"/>
+<circle class="dot2 same" cx="589.1" cy="52" r="5.5"><title>予備バッテリーの数: 0: 130.1 分</title></circle>
+<text class="val small" x="599.1" y="56">130.1</text>
+<text class="lab" x="240" y="84" text-anchor="end">予備バッテリーの数: 2</text>
+<line class="stem" x1="589.1" x2="589.1" y1="80" y2="80"/>
+<circle class="dot2 same" cx="589.1" cy="80" r="5.5"><title>予備バッテリーの数: 2: 130.1 分</title></circle>
+<text class="val small" x="599.1" y="84">130.1</text>
+<text class="lab" x="240" y="112" text-anchor="end">予備バッテリーの数: 3</text>
+<line class="stem" x1="589.1" x2="589.1" y1="108" y2="108"/>
+<circle class="dot2 same" cx="589.1" cy="108" r="5.5"><title>予備バッテリーの数: 3: 130.1 分</title></circle>
+<text class="val small" x="599.1" y="112">130.1</text>
+<text class="lab" x="240" y="140" text-anchor="end">離陸準備の時間: 0</text>
+<line class="stem" x1="589.1" x2="521.4" y1="136" y2="136"/>
+<circle class="dot2 better" cx="521.4" cy="136" r="5.5"><title>離陸準備の時間: 0: 120.1 分</title></circle>
+<text class="val small" x="599.1" y="140">120.1</text>
+<text class="lab" x="240" y="168" text-anchor="end">離陸準備の時間: 5</text>
+<line class="stem" x1="589.1" x2="555.3" y1="164" y2="164"/>
+<circle class="dot2 better" cx="555.3" cy="164" r="5.5"><title>離陸準備の時間: 5: 125.1 分</title></circle>
+<text class="val small" x="599.1" y="168">125.1</text>
+<text class="lab" x="240" y="196" text-anchor="end">離陸準備の時間: 20</text>
+<line class="stem" x1="589.1" x2="656.8" y1="192" y2="192"/>
+<circle class="dot2 worse" cx="656.8" cy="192" r="5.5"><title>離陸準備の時間: 20: 140.1 分</title></circle>
+<text class="val small" x="666.8" y="196">140.1</text>
+<text class="lab" x="240" y="224" text-anchor="end">充電の時間: 15</text>
+<line class="stem" x1="589.1" x2="524.2" y1="220" y2="220"/>
+<circle class="dot2 better" cx="524.2" cy="220" r="5.5"><title>充電の時間: 15: 120.5 分</title></circle>
+<text class="val small" x="599.1" y="224">120.5</text>
+<text class="lab" x="240" y="252" text-anchor="end">充電の時間: 20</text>
+<line class="stem" x1="589.1" x2="583.0" y1="248" y2="248"/>
+<circle class="dot2 better" cx="583.0" cy="248" r="5.5"><title>充電の時間: 20: 129.2 分</title></circle>
+<text class="val small" x="599.1" y="252">129.2</text>
+<text class="lab" x="240" y="280" text-anchor="end">充電の時間: 45</text>
+<line class="stem" x1="589.1" x2="627.0" y1="276" y2="276"/>
+<circle class="dot2 worse" cx="627.0" cy="276" r="5.5"><title>充電の時間: 45: 135.7 分</title></circle>
+<text class="val small" x="637.0" y="280">135.7</text>
+<text class="lab" x="240" y="308" text-anchor="end">車を 2 台足す: 県庁</text>
+<line class="stem" x1="589.1" x2="589.1" y1="304" y2="304"/>
+<circle class="dot2 same" cx="589.1" cy="304" r="5.5"><title>車を 2 台足す: 県庁: 130.1 分</title></circle>
+<text class="val small" x="599.1" y="308">130.1</text>
+<text class="lab" x="240" y="336" text-anchor="end">車を 2 台足す: 西南市役所</text>
+<line class="stem" x1="589.1" x2="589.1" y1="332" y2="332"/>
+<circle class="dot2 same" cx="589.1" cy="332" r="5.5"><title>車を 2 台足す: 西南市役所: 130.1 分</title></circle>
+<text class="val small" x="599.1" y="336">130.1</text>
+<text class="lab" x="240" y="364" text-anchor="end">車を 2 台足す: 北東町役場</text>
+<line class="stem" x1="589.1" x2="382.7" y1="360" y2="360"/>
+<circle class="dot2 better" cx="382.7" cy="360" r="5.5"><title>車を 2 台足す: 北東町役場: 99.6 分</title></circle>
+<text class="val small" x="599.1" y="364">99.6</text>
+<text class="lab" x="240" y="392" text-anchor="end">車の速さ（倍）: 1.5</text>
+<line class="stem" x1="589.1" x2="392.8" y1="388" y2="388"/>
+<circle class="dot2 better" cx="392.8" cy="388" r="5.5"><title>車の速さ（倍）: 1.5: 101.1 分</title></circle>
+<text class="val small" x="599.1" y="392">101.1</text>
+<text class="lab" x="240" y="420" text-anchor="end">車の速さ（倍）: 2.0</text>
+<line class="stem" x1="589.1" x2="342.7" y1="416" y2="416"/>
+<circle class="dot2 better" cx="342.7" cy="416" r="5.5"><title>車の速さ（倍）: 2.0: 93.7 分</title></circle>
+<text class="val small" x="599.1" y="420">93.7</text>
+<text class="lab" x="240" y="448" text-anchor="end">高速道路上でも離陸できる: 可</text>
+<line class="stem" x1="589.1" x2="589.1" y1="444" y2="444"/>
+<circle class="dot2 same" cx="589.1" cy="444" r="5.5"><title>高速道路上でも離陸できる: 可: 130.1 分</title></circle>
+<text class="val small" x="599.1" y="448">130.1</text>
+</svg></div>
+  <p><b>北東町役場（震源に最も近い拠点）に車を 2 台足すと 99.6 分</b>まで早くなります。県庁や西南市役所に足しても変わりません。車の速さ・離陸準備・充電の時間も効きますが、予備バッテリーの数はサンプルでは効きません。</p>
+</section>
+
+<section>
+  <h2>解き方</h2>
+  <div class="two">
+    <div><h3>古典</h3><p><b>厳密解法</b>: 車ごとに「行う飛行の組」とその完了時刻を、上限を超える組を枝刈りしながら列挙し、集合分割 MILP で全センサーをちょうど 1 回覆う組み合わせを選びます。上限を二分探索して最適を証明します。ほかに反復局所探索と、4 台ずつ解き直す LNS。</p></div>
+    <div><h3>QUBO</h3><p><b>列の集合分割 QUBO</b>: 厳密解法と同じ列・同じ制約を QUBO にしたもの（MILP との違いは解き方だけ）。ほかに「車の何番目の飛行」を変数にした時間枠の判定 QUBO と、LNS の部分問題を QUBO で解く方法。</p></div>
+  </div>
+  <div class="formula">E(x) =   Σ_センサー j ( Σ_{列 S ∋ j} x_S − 1 )²                ← 各センサーをちょうど 1 回
+       + Σ_拠点 b  ( Σ_{S ∈ b} x_S + スラック − 車の数_b )²     ← 拠点の車の数まで
+       + ( Σ_{予備が要る S} x_S + スラック − 予備の数 )²        ← 予備バッテリー
+       + ε Σ_S 完了時刻_S x_S / Σ 完了時刻                       ← 同点なら早く終わる方
+   （完了時刻 ≤ T の列だけを変数にし、T を二分探索）</div>
+  <p class="cap">式の詳細は GitHub の phase2/FORMULATION_real.md（下界・厳密解法の正しさの理由・Amplify での書き方つき）。</p>
+</section>
+
+<section>
+  <h2>多数の災害で比べる</h2>
+  <p>配布の道路網の上で、サンプルの傾向（震源から 20 km 以内が通信断、橋・トンネルほど通行止めになりやすい）に合わせて災害を 50 問作りました。A はサンプルと同じ規模、B〜E は震源が 2 つ・車が減る・通行止めが 130〜180 区間など、より複雑です。</p>
+  <div class="tbl"><table>
+    <thead><tr><th style="text-align:left">系統</th><th>問題</th><th>通信断（平均）</th><th>回復可能</th><th>通行止め</th><th>最適を証明</th><th>厳密解法の時間（中央値）</th></tr></thead>
+    <tbody><tr><th>サンプル</th><td>1</td><td>18.0</td><td>14.0</td><td>34.0</td><td>1 / 1</td><td>10.3 秒</td></tr>
+<tr><th>A_同等</th><td>10</td><td>14.2</td><td>12.2</td><td>34.5</td><td>10 / 10</td><td>10.1 秒</td></tr>
+<tr><th>B_大地震</th><td>10</td><td>25.3</td><td>19.0</td><td>73.1</td><td>9 / 10</td><td>10.7 秒</td></tr>
+<tr><th>C_複合</th><td>10</td><td>22.0</td><td>18.0</td><td>70.5</td><td>8 / 10</td><td>11.5 秒</td></tr>
+<tr><th>D_広域</th><td>10</td><td>37.0</td><td>29.9</td><td>128.6</td><td>3 / 10</td><td>192.1 秒</td></tr>
+<tr><th>E_連続大地震</th><td>10</td><td>47.0</td><td>32.9</td><td>178.0</td><td>3 / 10</td><td>191.8 秒</td></tr></tbody>
+  </table></div>
+  <h3>同じ計算時間（30 秒）での比較</h3>
+  <p>「最良」はその問題で全手法・全予算を通して見つかった最良の計画（まず回復数、次に完了時刻）。棒は最良との差の平均（横線は 95% 信頼区間）、右の数字は最良の回復数に届いた割合です。</p>
+  <div class="legend"><span class="key"><i class="sw classic"></i>古典</span><span class="key"><i class="sw qubo"></i>QUBO</span></div>
+  <div class="chart"><svg viewBox="0 0 760 302" role="img" aria-label="同じ計算時間 30 秒での最良との差">
+<line class="grid" x1="210.0" x2="210.0" y1="24" y2="272"/><text class="tick" x="210.0" y="290" text-anchor="middle">+0%</text>
+<line class="grid" x1="310.0" x2="310.0" y1="24" y2="272"/><text class="tick" x="310.0" y="290" text-anchor="middle">+10%</text>
+<line class="grid" x1="410.0" x2="410.0" y1="24" y2="272"/><text class="tick" x="410.0" y="290" text-anchor="middle">+20%</text>
+<line class="grid" x1="510.0" x2="510.0" y1="24" y2="272"/><text class="tick" x="510.0" y="290" text-anchor="middle">+30%</text>
+<line class="grid" x1="610.0" x2="610.0" y1="24" y2="272"/><text class="tick" x="610.0" y="290" text-anchor="middle">+40%</text>
+<text class="refl" x="622" y="18">最良の回復数に届いた</text>
+<text class="lab" x="200" y="45" text-anchor="end">列の集合分割 QUBO</text>
+<rect class="bar qubo" x="210" y="33" width="3.3" height="18" rx="2"><title>列の集合分割 QUBO: 平均 +0.33%（95% 信頼区間 0.02〜0.88）</title></rect>
+<line class="whisk" x1="210.2" x2="218.8" y1="42" y2="42"/>
+<text class="val small" x="224.8" y="46">+0.33%</text>
+<text class="val warn" x="622" y="46">32%</text>
+<text class="lab" x="200" y="79" text-anchor="end">反復局所探索</text>
+<rect class="bar classic" x="210" y="67" width="9.0" height="18" rx="2"><title>反復局所探索: 平均 +0.9%（95% 信頼区間 0.33〜1.64）</title></rect>
+<line class="whisk" x1="213.3" x2="226.4" y1="76" y2="76"/>
+<text class="val small" x="232.4" y="80">+0.9%</text>
+<text class="val" x="622" y="80">96%</text>
+<text class="lab" x="200" y="113" text-anchor="end">LNS（部分問題を MILP）</text>
+<rect class="bar classic" x="210" y="101" width="31.5" height="18" rx="2"><title>LNS（部分問題を MILP）: 平均 +3.15%（95% 信頼区間 1.3〜5.53）</title></rect>
+<line class="whisk" x1="223.0" x2="265.3" y1="110" y2="110"/>
+<text class="val small" x="271.3" y="114">+3.15%</text>
+<text class="val" x="622" y="114">96%</text>
+<text class="lab" x="200" y="147" text-anchor="end">LNS（部分問題を QUBO）</text>
+<rect class="bar qubo" x="210" y="135" width="36.0" height="18" rx="2"><title>LNS（部分問題を QUBO）: 平均 +3.6%（95% 信頼区間 1.67〜5.98）</title></rect>
+<line class="whisk" x1="226.7" x2="269.8" y1="144" y2="144"/>
+<text class="val small" x="275.8" y="148">+3.6%</text>
+<text class="val" x="622" y="148">96%</text>
+<text class="lab" x="200" y="181" text-anchor="end">厳密解法（時間内で打ち切り）</text>
+<rect class="bar classic" x="210" y="169" width="61.2" height="18" rx="2"><title>厳密解法（時間内で打ち切り）: 平均 +6.12%（95% 信頼区間 2.22〜11.08）</title></rect>
+<line class="whisk" x1="232.2" x2="320.8" y1="178" y2="178"/>
+<text class="val small" x="326.8" y="182">+6.12%</text>
+<text class="val" x="622" y="182">87%</text>
+<text class="lab" x="200" y="215" text-anchor="end">貪欲法 + 局所探索</text>
+<rect class="bar classic" x="210" y="203" width="165.8" height="18" rx="2"><title>貪欲法 + 局所探索: 平均 +16.58%（95% 信頼区間 11.15〜22.29）</title></rect>
+<line class="whisk" x1="321.5" x2="432.9" y1="212" y2="212"/>
+<text class="val small" x="438.9" y="216">+16.58%</text>
+<text class="val" x="622" y="216">96%</text>
+<text class="lab" x="200" y="249" text-anchor="end">時間枠の判定 QUBO</text>
+<rect class="bar qubo" x="210" y="237" width="343.4" height="18" rx="2"><title>時間枠の判定 QUBO: 平均 +34.34%（95% 信頼区間 21.54〜46.42）</title></rect>
+<line class="whisk" x1="425.4" x2="610.0" y1="246" y2="246"/>
+<text class="val small inbar" x="547.4" y="250" text-anchor="end">+34.34%</text>
+<text class="val" x="622" y="250">89%</text>
+</svg></div>
+  <p><b>反復局所探索が最良の回復数に 96% で届き、差も +0.9% と最も小さい</b>結果でした。列の集合分割 QUBO は、解が出れば最良との差 +0.33% とほぼ最適ですが、解が出たのは 32% の試行だけです。</p>
+  <div class="tbl"><table>
+    <thead><tr><th style="text-align:left">系統（30 秒）</th><th>反復局所探索</th><th>LNS（部分問題を MILP）</th><th>厳密解法（時間内で打ち切り）</th><th>LNS（部分問題を QUBO）</th><th>列の集合分割 QUBO</th><th>時間枠の判定 QUBO</th></tr></thead>
+    <tbody><tr><th>サンプル</th><td>+4.45%<small>届いた 100%</small></td><td class="best">+0.0%<small>届いた 100%</small></td><td class="best">+0.0%<small>届いた 100%</small></td><td>+4.45%<small>届いた 100%</small></td><td>+2.35%<small>届いた 100%</small></td><td class="best">+0.0%<small>届いた 100%</small></td></tr>
+<tr><th>A_同等</th><td>+1.5%<small>届いた 100%</small></td><td class="best">+0.0%<small>届いた 100%</small></td><td class="best">+0.0%<small>届いた 100%</small></td><td class="best">+0.0%<small>届いた 100%</small></td><td>+0.08%<small>届いた 91%</small></td><td>+0.65%<small>届いた 100%</small></td></tr>
+<tr><th>B_大地震</th><td class="best">+0.31%<small>届いた 100%</small></td><td>+0.93%<small>届いた 100%</small></td><td>+3.03%<small>届いた 100%</small></td><td>+1.55%<small>届いた 100%</small></td><td>+0.0%<small>届いた 10%</small></td><td>+24.69%<small>届いた 100%</small></td></tr>
+<tr><th>C_複合</th><td>+1.22%<small>届いた 100%</small></td><td class="best">+0.22%<small>届いた 100%</small></td><td>+3.81%<small>届いた 100%</small></td><td>+0.29%<small>届いた 100%</small></td><td>+0.0%<small>届いた 40%</small></td><td>+47.75%<small>届いた 100%</small></td></tr>
+<tr><th>D_広域</th><td class="best">+0.5%<small>届いた 90%</small></td><td>+5.97%<small>届いた 90%</small></td><td>+5.43%<small>届いた 60%</small></td><td>+6.48%<small>届いた 90%</small></td><td class="na">解なし</td><td>+65.08%<small>届いた 80%</small></td></tr>
+<tr><th>E_連続大地震</th><td class="best">+0.0%<small>届いた 90%</small></td><td>+10.61%<small>届いた 90%</small></td><td>+26.68%<small>届いた 70%</small></td><td>+10.89%<small>届いた 90%</small></td><td class="na">解なし</td><td>+60.34%<small>届いた 60%</small></td></tr></tbody>
+  </table></div>
+  <p class="cap">最良との差の平均と、最良の回復数に届いた割合。緑は各系統で最も良い手法（届いた割合 80% 以上の中で）。</p>
+</section>
+
+<section>
+  <h2>QUBO が解ける大きさ</h2>
+  <p>厳密解法と同じ列を QUBO（30 秒）と MILP で解き、QUBO が最適に届くかを列の数ごとに数えました。離陸地点が違うだけの列をまとめる工夫（最適値は変わらない）を入れた場合と入れない場合を合わせています。</p>
+  <div class="legend"><span class="key"><i class="sw ok"></i>最適</span><span class="key"><i class="sw subopt"></i>解は出たが最適でない</span><span class="key"><i class="sw fail"></i>解が出ない</span></div>
+  <div class="chart"><svg viewBox="0 0 760 300" role="img" aria-label="列の数ごとの QUBO の成功率">
+<line class="grid" x1="56" x2="740" y1="256.0" y2="256.0"/><text class="tick" x="48" y="260.0" text-anchor="end">0%</text>
+<line class="grid" x1="56" x2="740" y1="196.5" y2="196.5"/><text class="tick" x="48" y="200.5" text-anchor="end">25%</text>
+<line class="grid" x1="56" x2="740" y1="137.0" y2="137.0"/><text class="tick" x="48" y="141.0" text-anchor="end">50%</text>
+<line class="grid" x1="56" x2="740" y1="77.5" y2="77.5"/><text class="tick" x="48" y="81.5" text-anchor="end">75%</text>
+<line class="grid" x1="56" x2="740" y1="18.0" y2="18.0"/><text class="tick" x="48" y="22.0" text-anchor="end">100%</text>
+<rect class="seg ok" x="76.5" y="18.0" width="73.0" height="238.0"><title>列 〜50: 最適 8 / 8</title></rect>
+<text class="val small" x="113.0" y="14.0" text-anchor="middle">8/8</text>
+<text class="tick" x="113.0" y="278" text-anchor="middle">〜50</text>
+<rect class="seg ok" x="190.5" y="44.4" width="73.0" height="211.6"><title>列 50〜100: 最適 8 / 9</title></rect>
+<rect class="seg fail" x="190.5" y="18.0" width="73.0" height="26.4"><title>列 50〜100: 解が出ない 1 / 9</title></rect>
+<text class="val small" x="227.0" y="14.0" text-anchor="middle">8/9</text>
+<text class="tick" x="227.0" y="278" text-anchor="middle">50〜100</text>
+<rect class="seg ok" x="304.5" y="77.5" width="73.0" height="178.5"><title>列 100〜200: 最適 9 / 12</title></rect>
+<rect class="seg subopt" x="304.5" y="57.7" width="73.0" height="19.8"><title>列 100〜200: 解は出たが最適でない 1 / 12</title></rect>
+<rect class="seg fail" x="304.5" y="18.0" width="73.0" height="39.7"><title>列 100〜200: 解が出ない 2 / 12</title></rect>
+<text class="val small" x="341.0" y="14.0" text-anchor="middle">9/12</text>
+<text class="tick" x="341.0" y="278" text-anchor="middle">100〜200</text>
+<rect class="seg ok" x="418.5" y="211.4" width="73.0" height="44.6"><title>列 200〜500: 最適 3 / 16</title></rect>
+<rect class="seg subopt" x="418.5" y="166.8" width="73.0" height="44.6"><title>列 200〜500: 解は出たが最適でない 3 / 16</title></rect>
+<rect class="seg fail" x="418.5" y="18.0" width="73.0" height="148.8"><title>列 200〜500: 解が出ない 10 / 16</title></rect>
+<text class="val small" x="455.0" y="14.0" text-anchor="middle">3/16</text>
+<text class="tick" x="455.0" y="278" text-anchor="middle">200〜500</text>
+<rect class="seg ok" x="532.5" y="216.3" width="73.0" height="39.7"><title>列 500〜1,000: 最適 1 / 6</title></rect>
+<rect class="seg fail" x="532.5" y="18.0" width="73.0" height="198.3"><title>列 500〜1,000: 解が出ない 5 / 6</title></rect>
+<text class="val small" x="569.0" y="14.0" text-anchor="middle">1/6</text>
+<text class="tick" x="569.0" y="278" text-anchor="middle">500〜1,000</text>
+<rect class="seg fail" x="646.5" y="18.0" width="73.0" height="238.0"><title>列 1,000〜: 解が出ない 19 / 19</title></rect>
+<text class="val small" x="683.0" y="14.0" text-anchor="middle">0/19</text>
+<text class="tick" x="683.0" y="278" text-anchor="middle">1,000〜</text>
+<text class="tick" x="408.0" y="296" text-anchor="middle">QUBO の列（≒ 変数）の数</text>
+</svg></div>
+  <p><b>列が 100 未満ならほぼすべて最適、500 を超えるとほとんど解けません。</b>列をまとめると列は中央値 693 → 140 に減り、QUBO で解けた問題は 14 → 19 問（35 問中）に増えました。同じ列を MILP は中央値 0.59 秒で最適を証明します。</p>
+</section>
+
+<section>
+  <h2>平常時の備え：8 台を 3 拠点にどう分けるか</h2>
+  <p>各拠点に 1 台以上・合計 8 台の分け方 21 通りすべてで、同じ災害 21 問（サンプル + A 10 問 + B 10 問）を厳密解法で解きました。棒は完了時刻の平均 [分]、下の数字は県庁・西南市役所・北東町役場の台数です。</p>
+  <div class="chart"><svg viewBox="0 0 760 300" role="img" aria-label="8 台の分け方ごとの完了時刻の平均">
+<line class="grid" x1="56" x2="744" y1="236.0" y2="236.0"/><text class="tick" x="48" y="240.0" text-anchor="end">140</text>
+<line class="grid" x1="56" x2="744" y1="199.3" y2="199.3"/><text class="tick" x="48" y="203.3" text-anchor="end">150</text>
+<line class="grid" x1="56" x2="744" y1="162.7" y2="162.7"/><text class="tick" x="48" y="166.7" text-anchor="end">160</text>
+<line class="grid" x1="56" x2="744" y1="126.0" y2="126.0"/><text class="tick" x="48" y="130.0" text-anchor="end">170</text>
+<line class="grid" x1="56" x2="744" y1="89.3" y2="89.3"/><text class="tick" x="48" y="93.3" text-anchor="end">180</text>
+<line class="grid" x1="56" x2="744" y1="52.7" y2="52.7"/><text class="tick" x="48" y="56.7" text-anchor="end">190</text>
+<line class="grid" x1="56" x2="744" y1="16.0" y2="16.0"/><text class="tick" x="48" y="20.0" text-anchor="end">200</text>
+<rect class="abar " x="60.9" y="203.3" width="22.9" height="32.7" rx="2"><title>県庁 5・西南 1・北東 2: 平均 148.92 分, 最悪 304.33 分</title></rect>
+<text class="tick" x="72.4" y="256" text-anchor="middle">5</text><text class="tick" x="72.4" y="270" text-anchor="middle">1</text><text class="tick" x="72.4" y="284" text-anchor="middle">2</text>
+<rect class="abar cur" x="93.7" y="202.3" width="22.9" height="33.7" rx="2"><title>県庁 4・西南 2・北東 2: 平均 149.19 分, 最悪 321.46 分</title></rect>
+<text class="tick" x="105.1" y="256" text-anchor="middle">4</text><text class="tick" x="105.1" y="270" text-anchor="middle">2</text><text class="tick" x="105.1" y="284" text-anchor="middle">2</text>
+<text class="val small" x="105.1" y="196.3" text-anchor="middle">現状</text>
+<rect class="abar alt" x="126.4" y="201.6" width="22.9" height="34.4" rx="2"><title>県庁 4・西南 1・北東 3: 平均 149.39 分, 最悪 285.02 分</title></rect>
+<text class="tick" x="137.9" y="256" text-anchor="middle">4</text><text class="tick" x="137.9" y="270" text-anchor="middle">1</text><text class="tick" x="137.9" y="284" text-anchor="middle">3</text>
+<text class="val small" x="137.9" y="179.6" text-anchor="middle">最悪に強い</text>
+<rect class="abar " x="159.2" y="194.2" width="22.9" height="41.8" rx="2"><title>県庁 3・西南 3・北東 2: 平均 151.39 分, 最悪 312.69 分</title></rect>
+<text class="tick" x="170.7" y="256" text-anchor="middle">3</text><text class="tick" x="170.7" y="270" text-anchor="middle">3</text><text class="tick" x="170.7" y="284" text-anchor="middle">2</text>
+<rect class="abar " x="192.0" y="189.4" width="22.9" height="46.6" rx="2"><title>県庁 6・西南 1・北東 1: 平均 152.7 分, 最悪 352.26 分</title></rect>
+<text class="tick" x="203.4" y="256" text-anchor="middle">6</text><text class="tick" x="203.4" y="270" text-anchor="middle">1</text><text class="tick" x="203.4" y="284" text-anchor="middle">1</text>
+<rect class="abar " x="224.7" y="188.7" width="22.9" height="47.3" rx="2"><title>県庁 3・西南 2・北東 3: 平均 152.89 分, 最悪 327.06 分</title></rect>
+<text class="tick" x="236.2" y="256" text-anchor="middle">3</text><text class="tick" x="236.2" y="270" text-anchor="middle">2</text><text class="tick" x="236.2" y="284" text-anchor="middle">3</text>
+<rect class="abar " x="257.5" y="187.4" width="22.9" height="48.6" rx="2"><title>県庁 5・西南 2・北東 1: 平均 153.25 分, 最悪 372.8 分</title></rect>
+<text class="tick" x="269.0" y="256" text-anchor="middle">5</text><text class="tick" x="269.0" y="270" text-anchor="middle">2</text><text class="tick" x="269.0" y="284" text-anchor="middle">1</text>
+<rect class="abar " x="290.2" y="182.3" width="22.9" height="53.7" rx="2"><title>県庁 4・西南 3・北東 1: 平均 154.64 分, 最悪 372.8 分</title></rect>
+<text class="tick" x="301.7" y="256" text-anchor="middle">4</text><text class="tick" x="301.7" y="270" text-anchor="middle">3</text><text class="tick" x="301.7" y="284" text-anchor="middle">1</text>
+<rect class="abar " x="323.0" y="173.1" width="22.9" height="62.9" rx="2"><title>県庁 2・西南 3・北東 3: 平均 157.16 分, 最悪 327.06 分</title></rect>
+<text class="tick" x="334.5" y="256" text-anchor="middle">2</text><text class="tick" x="334.5" y="270" text-anchor="middle">3</text><text class="tick" x="334.5" y="284" text-anchor="middle">3</text>
+<rect class="abar " x="355.8" y="168.6" width="22.9" height="67.4" rx="2"><title>県庁 3・西南 1・北東 4: 平均 158.37 分, 最悪 357.09 分</title></rect>
+<text class="tick" x="367.2" y="256" text-anchor="middle">3</text><text class="tick" x="367.2" y="270" text-anchor="middle">1</text><text class="tick" x="367.2" y="284" text-anchor="middle">4</text>
+<rect class="abar " x="388.5" y="168.3" width="22.9" height="67.7" rx="2"><title>県庁 2・西南 4・北東 2: 平均 158.47 分, 最悪 326.78 分</title></rect>
+<text class="tick" x="400.0" y="256" text-anchor="middle">2</text><text class="tick" x="400.0" y="270" text-anchor="middle">4</text><text class="tick" x="400.0" y="284" text-anchor="middle">2</text>
+<rect class="abar " x="421.3" y="167.8" width="22.9" height="68.2" rx="2"><title>県庁 3・西南 4・北東 1: 平均 158.59 分, 最悪 361.58 分</title></rect>
+<text class="tick" x="432.8" y="256" text-anchor="middle">3</text><text class="tick" x="432.8" y="270" text-anchor="middle">4</text><text class="tick" x="432.8" y="284" text-anchor="middle">1</text>
+<rect class="abar " x="454.1" y="160.8" width="22.9" height="75.2" rx="2"><title>県庁 2・西南 2・北東 4: 平均 160.51 分, 最悪 333.23 分</title></rect>
+<text class="tick" x="465.5" y="256" text-anchor="middle">2</text><text class="tick" x="465.5" y="270" text-anchor="middle">2</text><text class="tick" x="465.5" y="284" text-anchor="middle">4</text>
+<rect class="abar " x="486.8" y="146.6" width="22.9" height="89.4" rx="2"><title>県庁 1・西南 4・北東 3: 平均 164.38 分, 最悪 321.41 分</title></rect>
+<text class="tick" x="498.3" y="256" text-anchor="middle">1</text><text class="tick" x="498.3" y="270" text-anchor="middle">4</text><text class="tick" x="498.3" y="284" text-anchor="middle">3</text>
+<rect class="abar " x="519.6" y="141.6" width="22.9" height="94.4" rx="2"><title>県庁 2・西南 5・北東 1: 平均 165.74 分, 最悪 361.58 分</title></rect>
+<text class="tick" x="531.0" y="256" text-anchor="middle">2</text><text class="tick" x="531.0" y="270" text-anchor="middle">5</text><text class="tick" x="531.0" y="284" text-anchor="middle">1</text>
+<rect class="abar " x="552.3" y="133.4" width="22.9" height="102.6" rx="2"><title>県庁 1・西南 5・北東 2: 平均 167.97 分, 最悪 327.46 分</title></rect>
+<text class="tick" x="563.8" y="256" text-anchor="middle">1</text><text class="tick" x="563.8" y="270" text-anchor="middle">5</text><text class="tick" x="563.8" y="284" text-anchor="middle">2</text>
+<rect class="abar " x="585.1" y="129.3" width="22.9" height="106.7" rx="2"><title>県庁 2・西南 1・北東 5: 平均 169.11 分, 最悪 368.41 分</title></rect>
+<text class="tick" x="596.6" y="256" text-anchor="middle">2</text><text class="tick" x="596.6" y="270" text-anchor="middle">1</text><text class="tick" x="596.6" y="284" text-anchor="middle">5</text>
+<rect class="abar " x="617.9" y="127.6" width="22.9" height="108.4" rx="2"><title>県庁 1・西南 3・北東 4: 平均 169.56 分, 最悪 403.91 分</title></rect>
+<text class="tick" x="629.3" y="256" text-anchor="middle">1</text><text class="tick" x="629.3" y="270" text-anchor="middle">3</text><text class="tick" x="629.3" y="284" text-anchor="middle">4</text>
+<rect class="abar " x="650.6" y="103.7" width="22.9" height="132.3" rx="2"><title>県庁 1・西南 2・北東 5: 平均 176.09 分, 最悪 401.39 分</title></rect>
+<text class="tick" x="662.1" y="256" text-anchor="middle">1</text><text class="tick" x="662.1" y="270" text-anchor="middle">2</text><text class="tick" x="662.1" y="284" text-anchor="middle">5</text>
+<rect class="abar " x="683.4" y="91.6" width="22.9" height="144.4" rx="2"><title>県庁 1・西南 6・北東 1: 平均 179.37 分, 最悪 361.58 分</title></rect>
+<text class="tick" x="694.9" y="256" text-anchor="middle">1</text><text class="tick" x="694.9" y="270" text-anchor="middle">6</text><text class="tick" x="694.9" y="284" text-anchor="middle">1</text>
+<rect class="abar " x="716.2" y="40.2" width="22.9" height="195.8" rx="2"><title>県庁 1・西南 1・北東 6: 平均 193.4 分, 最悪 401.6 分</title></rect>
+<text class="tick" x="727.6" y="256" text-anchor="middle">1</text><text class="tick" x="727.6" y="270" text-anchor="middle">1</text><text class="tick" x="727.6" y="284" text-anchor="middle">6</text>
+<text class="tick" x="48" y="256" text-anchor="end">県庁</text><text class="tick" x="48" y="270" text-anchor="end">西南</text><text class="tick" x="48" y="284" text-anchor="end">北東</text>
+</svg></div>
+  <p><b>現状の 4・2・2 は平均 149.19 分で、1 位（148.92 分）とほぼ同じです。</b>最悪の災害に備えるなら 4・1・3（西南市役所から北東町役場へ 1 台）で、最悪が 321.46 → 285.02 分になります。1 拠点に偏らせると（1・1・6）平均 193.4 分まで遅くなります。</p>
+</section>
+
+<section>
+  <h2>次にやること</h2>
+  <div class="two">
+    <div><h3>QUBO を試し直す</h3><p>Amplify AE で列の集合分割 QUBO と LNS の部分問題を解き、CPU の焼きなましとの差を確かめる。列が数百を超える問題で解が出るかが焦点。</p></div>
+    <div><h3>運用に近づける</h3><p>災害の情報が少しずつ分かる場合の再計画、ドローンが別の車のドックに降りる発展形、車の配置を平常時の計画（Phase 1）とまとめて考える。</p></div>
+  </div>
+</section>
+
+<footer>
+  <span>コード・式・結果: <a href="https://github.com/mori560269/Q-Questgrow-/tree/claude/request-5v4fsc/phase2">mori560269/Q-Questgrow-（phase2/README_real.md, FORMULATION_real.md）</a></span>
+  <span>条件は配布シナリオの値（車 8 台、離陸準備 10 分、最大飛行 15 分、滞空 3 分/基、40 km/h、充電 30 分×4 回、予備バッテリー 1 個）。生成した災害は配布の道路網の上に作ったもの。</span>
+</footer>
+</div>
