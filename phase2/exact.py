@@ -123,8 +123,14 @@ def solve_exact(I, UB=None, start=None, time_limit=600.0, log=None, reduce=False
     e0 = I.evaluate(start)
     full = e0["recovered"] == len(J) and e0["feasible"]
     UB = e0["makespan"] if UB is None else UB
+    if not full:
+        # 全基は回復できない: 回復数を増やす列は今の完了時刻より遅く終わるかもしれないので, 上限を 1.3 倍にゆるめる
+        # （このときは厳密ではない. 結果は optimal=False）
+        fin = [v for v in [UB] if np.isfinite(v)]
+        UB = (fin[0] if fin else 600.0) * 1.3
     classes = truck_classes(I)
     cols, truncated = enumerate_columns(I, UB, time_limit=time_limit * 0.6)
+    cols = [c for c in cols if np.isfinite(c[2])]
     if reduce:
         cols = reduce_columns(I, cols)
     if log:

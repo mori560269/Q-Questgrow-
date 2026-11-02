@@ -196,7 +196,8 @@ class Instance:
             m, r, order = self.truck_schedule(tr, fids, tr.tid in need)
             per[tr.tid] = dict(makespan=m, order=order, flights=list(fids), spare=tr.tid in need)
             for j, t in r.items():
-                rec[j] = min(rec.get(j, np.inf), t)
+                if np.isfinite(t):          # 届かない離陸地点を割り当てた飛行は回復に数えない
+                    rec[j] = min(rec.get(j, np.inf), t)
             ms = max(ms, m)
         covered = [j for j in self.recoverable if j in rec]
         return dict(recovered=len(covered), recoverable=len(self.recoverable), unreachable=len(self.unreachable),

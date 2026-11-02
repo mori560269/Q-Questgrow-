@@ -159,7 +159,7 @@ def _save(f, obj):
     os.replace(tmp, f)
 
 
-def run_ref(procs=1):
+def run_ref(procs=4):
     f = os.path.join(RES, "real_batch_ref.json")
     done = {r["問題"] for r in _load(f)}
     cnt = {}
@@ -205,10 +205,22 @@ def stats():
     from batch import boot_ci, sign_test
     ref = {r["問題"]: r for r in _load(os.path.join(RES, "real_batch_ref.json"))}
     rec = _load(os.path.join(RES, "real_batch_equal.json"))
-    # 問題ごとの最良: 基準（厳密解法 300 秒）と, 全手法・全予算で見つかった最良の小さい方
-    best = {p: r["最良"] for p, r in ref.items() if r["回復数"] == r["回復可能"]}
+    # 完了時刻が無限大（届かない離陸地点を割り当てた）なら解なしと同じ扱い
     for r in rec:
-        if r["完了時刻"] is not None and r["回復数"] == r["回復可能"]:
+        if r["完了時刻"] is not None and not np.isfinite(r["完了時刻"]):
+            r["完了時刻"] = None
+    # 問題ごとの最良: まず回復数の最大（全手法・基準を通して）, その回復数での最短の完了時刻
+    maxrec = {}
+    for r in list(ref.values()) + rec:
+        p = r["問題"]
+        if r.get("回復数") is not None and (r.get("完了時刻", r.get("最良")) is not None):
+            maxrec[p] = max(maxrec.get(p, 0), r["回復数"])
+    best = {}
+    for p, r in ref.items():
+        if r["回復数"] == maxrec.get(p):
+            best[p] = r["最良"]
+    for r in rec:
+        if r["完了時刻"] is not None and r["回復数"] == maxrec.get(r["問題"]):
             best[r["問題"]] = min(best.get(r["問題"], np.inf), r["完了時刻"])
     fams = sorted({r["系統"] for r in ref.values()})
     ref_name = "古典: 反復局所探索"
@@ -220,7 +232,7 @@ def stats():
                 rs = [r for r in sub if r["手法"] == m]
                 if not rs:
                     continue
-                ok = [r for r in rs if r["完了時刻"] is not None and r["回復数"] == r["回復可能"] and r["問題"] in best]
+                ok = [r for r in rs if r["完了時刻"] is not None and r["回復数"] == maxrec.get(r["問題"]) and r["問題"] in best]
                 gaps = [(r["完了時刻"] - best[r["問題"]]) / best[r["問題"]] * 100 for r in ok]
                 lbg = [(r["完了時刻"] - ref[r["問題"]]["下界"]) / ref[r["問題"]]["下界"] * 100 for r in ok
                        if ref.get(r["問題"], {}).get("下界", 0) > 0]
@@ -238,7 +250,7 @@ def stats():
                         elif a[0] > b[0] or (a[0] == b[0] and a[1] > b[1] + 0.05): l += 1
                         else: t += 1
                 out.append(dict(予算_秒=B, 系統=fam, 手法=m, 試行=len(rs),
-                                全基回復の割合=round(len(ok) / len(rs), 3),
+                                最大回復数に届いた割合=round(len(ok) / len(rs), 3),
                                 最良との差_平均=None if not gaps else round(float(np.mean(gaps)), 2),
                                 最良との差_95CI=boot_ci(gaps),
                                 最良と同じ割合=None if not gaps else round(float(np.mean([g < 0.05 for g in gaps])), 3),

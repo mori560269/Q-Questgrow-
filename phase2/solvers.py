@@ -59,9 +59,10 @@ class Evaluator:
             if len(f) > tr.cap(True):
                 over = True
             m, r, _ = self.truck(tr.tid, f)
-            ms_sum += m
+            ms_sum += m if np.isfinite(m) else 1e6
             for j, t in r.items():
-                rec[j] = min(rec.get(j, np.inf), t)
+                if np.isfinite(t):          # 届かない離陸地点の飛行は回復に数えない
+                    rec[j] = min(rec.get(j, np.inf), t)
         feas = (spare_need <= I.spares_left) and not over
         ms = max(rec.values(), default=0.0)
         if self.mode == "sum":
