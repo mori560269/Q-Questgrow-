@@ -5,6 +5,7 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 let aiAvailable: Promise<boolean> | null = null;
 
 export function checkAi(): Promise<boolean> {
+  if (import.meta.env.VITE_EMBED === "1") return Promise.resolve(false); // サーバーなしのプレビュー
   aiAvailable ??= fetch("/api/health")
     .then((r) => (r.ok ? r.json() : { ai: false }))
     .then((j: { ai?: boolean }) => Boolean(j.ai))

@@ -1,6 +1,7 @@
 import type { Session } from "../data/event";
 import { statusOf, waitlistPosition } from "../lib/reservation";
 import { actions, liveState, seatsLeft, useStore } from "../lib/store";
+import { confirmDialog } from "./ConfirmDialog";
 import { toast } from "./Toast";
 
 export function ReserveButton({ session, small = false }: { session: Session; small?: boolean }) {
@@ -17,9 +18,13 @@ export function ReserveButton({ session, small = false }: { session: Session; sm
     return (
       <button
         className={`${cls} secondary`}
-        onClick={(e) => {
+        onClick={async (e) => {
           e.preventDefault();
-          if (!confirm(mine === "booked" ? "予約をキャンセルしますか？" : "キャンセル待ちを取り消しますか？")) return;
+          const ok = await confirmDialog(mine === "booked" ? `「${session.title}」の予約をキャンセルしますか？` : `「${session.title}」のキャンセル待ちを取り消しますか？`, {
+            okLabel: mine === "booked" ? "予約をキャンセル" : "取り消す",
+            danger: true,
+          });
+          if (!ok) return;
           actions.cancel(session);
           toast(mine === "booked" ? "予約をキャンセルしました" : "キャンセル待ちを取り消しました");
         }}

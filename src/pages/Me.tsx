@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Avatar } from "../components/Avatar";
 import { SubHeader } from "../components/SubHeader";
+import { confirmDialog } from "../components/ConfirmDialog";
 import { toast } from "../components/Toast";
 import type { Role } from "../data/event";
 import { actions, useStore } from "../lib/store";
@@ -67,8 +68,8 @@ export function MePage() {
         <div className="card">
           <button
             className="btn secondary block"
-            onClick={() => {
-              if (!confirm("予約・つながり・問い合わせなどのデモデータをすべて初期化しますか？")) return;
+            onClick={async () => {
+              if (!(await confirmDialog("予約・つながり・問い合わせなどのデモデータをすべて初期化しますか？", { okLabel: "初期化する", danger: true }))) return;
               actions.reset();
               toast("初期化しました");
             }}

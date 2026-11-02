@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { StatusChip } from "../components/SessionCard";
+import { confirmDialog } from "../components/ConfirmDialog";
 import { toast } from "../components/Toast";
 import { SESSIONS, ZONES } from "../data/event";
 import { draftAnnouncement } from "../lib/api";
@@ -144,7 +145,7 @@ function FlowTab() {
             </div>
             <div className="row between small muted" style={{ marginTop: 8 }}>
               <span>{x.requiresReservation ? `予約 ${booked}/${x.capacity}` : `定員 ${x.capacity}`}・待ち {s.ledger.waitlist[x.id]?.length ?? 0}</span>
-              <button className="link" style={{ color: "var(--danger)" }} onClick={() => { if (confirm(s.cancelled[x.id] ? "中止を取り消しますか？" : "このプログラムを中止にしますか？")) actions.toggleCancelled(x.id); }}>
+              <button className="link" style={{ color: "var(--danger)" }} onClick={async () => { if (await confirmDialog(s.cancelled[x.id] ? `「${x.title}」の中止を取り消しますか？` : `「${x.title}」を中止にしますか？来場者のアプリに「中止」と表示されます。`, { okLabel: s.cancelled[x.id] ? "取り消す" : "中止にする", danger: !s.cancelled[x.id] })) actions.toggleCancelled(x.id); }}>
                 {s.cancelled[x.id] ? "中止を取り消す" : "中止にする"}
               </button>
             </div>

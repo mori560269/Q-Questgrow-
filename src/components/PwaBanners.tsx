@@ -22,6 +22,12 @@ export function PwaStatus() {
 
 /** ホーム画面への追加を案内するカード（ホームに表示） */
 export function InstallCard() {
+  // 埋め込みプレビューではインストールできないので出さない（ビルド時に決まる定数なのでフックの順序は変わらない）
+  if (import.meta.env.VITE_EMBED === "1") return null;
+  return <InstallCardInner />;
+}
+
+function InstallCardInner() {
   const { installEvent, installed } = usePwa();
   const [dismissed, setDismissed] = useState(() => {
     try {

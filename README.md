@@ -33,6 +33,10 @@ npm run typecheck
 npm run build && npm start   # 本番ビルドを Express から配信
 ```
 
+### 埋め込みプレビュー
+
+`VITE_EMBED=1` を付けてビルドすると、サーバーなしで動くプレビュー版になります（`VITE_EMBED=1 npx vite build --base ./`）。この版では URL を書き換えないルーターを使い、Service Worker は登録しません。AI はローカル応答で動きます。
+
 ## PWA（ホーム画面に追加）
 
 - ホーム画面に追加すると、ブラウザのバーなしでアプリとして起動します。マニフェストのショートカットとして「チケット」「マップ」「AIに聞く」も登録されます。
