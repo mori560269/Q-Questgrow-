@@ -148,8 +148,10 @@ class Instance:
 
         def run(order):
             t, ready, pos, used, rec = truck.t0, truck.ready, truck.node, 0, {}
-            for v in order:
-                t += self.drive(pos, v) if pos != v else 0.0
+            for i, v in enumerate(order):
+                # 実データでは停車ごとに離陸準備（setup 分）がかかる. drive() は準備時間込み.
+                # 出発地点でそのまま離陸する場合も, 最初の 1 回は準備がいる
+                t += self.drive(pos, v) if pos != v else (getattr(self, "setup", 0.0) if i == 0 else 0.0)
                 pos = v
                 for f in stops[v]:
                     fl = self.flights[f]
