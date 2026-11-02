@@ -235,7 +235,7 @@ def stats():
                 ok = [r for r in rs if r["完了時刻"] is not None and r["回復数"] == maxrec.get(r["問題"]) and r["問題"] in best]
                 gaps = [(r["完了時刻"] - best[r["問題"]]) / best[r["問題"]] * 100 for r in ok]
                 lbg = [(r["完了時刻"] - ref[r["問題"]]["下界"]) / ref[r["問題"]]["下界"] * 100 for r in ok
-                       if ref.get(r["問題"], {}).get("下界", 0) > 0]
+                       if 0 < ref.get(r["問題"], {}).get("下界", 0) < np.inf and r["回復数"] == r["回復可能"]]
                 w = l = t = 0
                 if m != ref_name:
                     for r in rs:
@@ -265,7 +265,9 @@ def stats():
                            対応不能_平均=round(float(np.mean([r["対応不能"] for r in rs])), 1),
                            通行止め_平均=round(float(np.mean([r["通行止め"] for r in rs])), 1),
                            最適を証明=sum(bool(r["最適"]) for r in rs),
-                           下界との差_平均=round(float(np.mean([(r["最良"] - r["下界"]) / r["下界"] * 100 for r in rs if r["下界"] > 0])), 2),
+                           下界との差_平均=round(float(np.mean([(r["最良"] - r["下界"]) / r["下界"] * 100 for r in rs
+                                                       if 0 < r["下界"] < np.inf and r["回復数"] == r["回復可能"]] or [np.nan])), 2),
+                           全基回復が不可能=sum(1 for r in rs if r["下界"] == np.inf),
                            厳密解法の時間_中央値=round(float(np.median([r["秒"] for r in rs])), 1)))
     _save(os.path.join(RES, "real_batch_stats.json"), dict(reference=refsum, equal_time=out))
     for r in refsum:
