@@ -159,7 +159,7 @@ def _save(f, obj):
     os.replace(tmp, f)
 
 
-def run_ref(procs=4):
+def run_ref(procs=1):
     f = os.path.join(RES, "real_batch_ref.json")
     done = {r["問題"] for r in _load(f)}
     cnt = {}
@@ -176,7 +176,7 @@ def run_ref(procs=4):
             print(r["問題"], r["回復可能"], r["下界"], r["最良"], r["最適"], r["秒"], flush=True)
 
 
-def run_equal(procs=4):
+def run_equal(procs=3):
     f = os.path.join(RES, "real_batch_equal.json")
     out = _load(f)
     done = {(r["問題"], r["手法"], r["予算_秒"], r["種"]) for r in out}
