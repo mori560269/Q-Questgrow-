@@ -25,7 +25,7 @@ md("""
 | 3 | 古典: 貪欲法 / 反復局所探索 / **厳密解法（最適を証明）** | 約 20 秒 |
 | 4 | 最適計画の地図と車ごとの行動 | 数秒 |
 | 5 | QUBO（CPU の焼きなまし）: 列の集合分割 QUBO・時間枠の判定 QUBO | 約 1 分 |
-| 6 | QUBO を **Amplify AE** で解く（任意・トークンが必要） | 約 1 分 |
+| 6 | QUBO を **Amplify AE** で解く（任意・トークンが必要）. 6-2 は大きい問題で neal と比べる | 約 1 分 + 6-2 は約 10 分 |
 | 7 | 条件を変えて解き直す（車の台数・速さ・充電・予備バッテリー） | 約 20 秒 |
 | 8 | 災害を作って解く（同等〜より複雑な 5 系統） | 約 1 分 |
 | 9 | 保存済みの大規模実験（51 問）の結果 | 数秒 |
@@ -208,6 +208,7 @@ code(r'''
 USE_AMPLIFY = False
 AE_MS = 3000
 
+token = None
 if USE_AMPLIFY:
     from getpass import getpass
     token = os.environ.get("AMPLIFY_TOKEN") or getpass("Amplify AE のトークン: ").strip()
@@ -221,6 +222,36 @@ if USE_AMPLIFY:
         print("Amplify AE: 制約を満たす解が出ませんでした")
 else:
     print("USE_AMPLIFY = True にすると実行します")
+''')
+
+md("""
+### 6-2. 大きい問題を Amplify AE で解く（焼きなましでは解が出なかった大きさ）
+
+生成した災害で, 列（変数）が数百〜数千の問題を, CPU の焼きなまし（neal）と Amplify AE で同じ時間だけ解き, 厳密解法（MILP）の最適値と比べます。
+`USE_AMPLIFY = True` のときだけ Amplify AE を使います。`REDUCE = False` にすると列をまとめず, 変数がさらに多くなります。
+""")
+code(r'''
+BIG = [("B_大地震", 3), ("C_複合", 1), ("D_広域", 7)]     # (系統, 乱数の種)
+REDUCE = True
+BUDGET_BIG = 120         # 1 問あたり [秒]
+
+rows_big = []
+for fam, sd in BIG:
+    Ib = RealInstance(rw, make_real_scenario(rw, fam, sd))
+    stb = S.local_search(Ib, S.greedy(Ib), 1.0)
+    pe, ie = solve_exact(Ib, start=ils(Ib, 5.0, 0), time_limit=300)
+    optb = Ib.evaluate(pe)["makespan"]
+    r = dict(問題=f"{fam}_{sd}", 回復可能=len(Ib.recoverable), 最適_MILP=round(optb, 2), 最適を証明=ie["optimal"])
+    for be in (["neal", "amplify"] if USE_AMPLIFY else ["neal"]):
+        t = time.time()
+        pq, qi = solve_column_qubo(Ib, BUDGET_BIG, 0, start=stb, reduce=REDUCE, backend=be,
+                                   token=token if be == "amplify" else None, ae_ms=AE_MS)
+        r[f"{be}_完了"] = None if pq is None else round(Ib.evaluate(pq)["makespan"], 2)
+        r[f"{be}_最大変数"] = max((h["変数"] or 0) for h in qi["history"]) if qi["history"] else 0
+        r[f"{be}_秒"] = round(time.time() - t, 1)
+    rows_big.append(r)
+    print(r)
+pd.DataFrame(rows_big)
 ''')
 
 md("""
