@@ -311,7 +311,8 @@ def _build_column_qubo_per_truck(I, cols, classes, T, J, eps_total=0.3):
     return dict(lin=lin, Q=Q, var=var, nX=n, n=nn, per_truck=True)
 
 
-def solve_column_qubo(I, budget, seed=0, UB=None, start=None, cols=None, chunk=(16, 2000), log=None, reduce=False):
+def solve_column_qubo(I, budget, seed=0, UB=None, start=None, cols=None, chunk=(16, 2000), log=None, reduce=False,
+                      backend="neal", token=None, ae_ms=3000):
     """列の列挙（古典の前処理, MILP と共通）+ 集合分割 QUBO の二分探索（焼きなまし）.
     戻り値: plan, info"""
     from qubo_amplify import solve_inner
@@ -357,7 +358,8 @@ def solve_column_qubo(I, budget, seed=0, UB=None, start=None, cols=None, chunk=(
             left = max(0.05, t_end - time.time())
             sweeps = int(min(chunk[1], max(50, left / (rate * nnz * chunk[0])))) if rate else min(chunk[1], 200)
             ts = time.time()
-            sols, _ = solve_inner(mdl["lin"], mdl["Q"], "neal", None, 1000, chunk[0], sweeps, (seed * 7919 + it) % (1 << 31))
+            # backend="amplify" なら Amplify AE（ae_ms ミリ秒）. 既定は CPU の焼きなまし（neal）
+            sols, _ = solve_inner(mdl["lin"], mdl["Q"], backend, token, ae_ms, chunk[0], sweeps, (seed * 7919 + it) % (1 << 31))
             rate = (time.time() - ts) / (nnz * chunk[0] * sweeps)
             it += 1
             for s in sols:

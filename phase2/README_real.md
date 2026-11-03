@@ -1,5 +1,7 @@
 # Phase 2（実データ）: 配布データでの結果
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mori560269/Q-Questgrow-/blob/claude/request-5v4fsc/notebooks/phase2_real_colab.ipynb)  Colab で動かす: `notebooks/phase2_real_colab.ipynb`（データの確認・厳密解法・QUBO・Amplify AE（任意）・条件変更・災害の生成）
+
 配布された道路網（`data/phase2_real/roads.geojson` 道路区間 1,682, `road_nodes.geojson` 道路ノード 1,597）と
 サンプル災害（`scenario_sample.json`）で Phase 2 を解きました。式は [`FORMULATION_real.md`](FORMULATION_real.md)。
 
