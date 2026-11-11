@@ -124,6 +124,12 @@ int G[M][2];
 int PT[M + 1][2];  // PT[0]=S, PT[i+1]=G[i]
 
 struct Aff { int a[2]; int b; };
+#ifndef MAXJ
+#define MAXJ 3
+#endif
+#ifndef DEEPF
+#define DEEPF 0.1
+#endif
 
 struct Cand {
     float ev;
@@ -131,7 +137,7 @@ struct Cand {
     int parent;
     int8_t depth;
     int16_t seq;
-    uint8_t p[2][2];
+    uint8_t p[MAXJ][2];
 };
 
 struct State {
@@ -139,7 +145,7 @@ struct State {
     int parent;
     int8_t depth;
     int16_t seq;
-    uint8_t p[2][2];
+    uint8_t p[MAXJ][2];
     uint8_t tk[K][2];
 };
 
@@ -148,6 +154,8 @@ static int curParent;
 static int curCost;
 static int curLeg;
 static int maxDepth;
+static int curX[2];
+static int curTk[K][2];
 static vector<Cand>* outC;
 
 static inline int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -222,9 +230,6 @@ static inline float heur(const int tk[K][2]) {
 #ifndef LP
 #define LP 1
 #endif
-static int curX[2];
-static int curTk[K][2];
-
 static inline bool inb(int a, int b) { return (unsigned)a < (unsigned)N && (unsigned)b < (unsigned)N; }
 static inline int md(const int* a, const int* b) { return abs(a[0] - b[0]) + abs(a[1] - b[1]); }
 static inline void clampBox(const int* p, const int* a, const int* b, int* o) {
@@ -329,6 +334,104 @@ static void evaluate2(int k1, int k2) {
     outC->push_back(cd);
 }
 
+static inline int fcost(int A, int B, int g, int w) { return abs(w) + abs(g - A - B * w); }
+
+static void evaluateD(int depth, int seq, const Aff& P, const Aff* tok, const int* lo, const int* hi) {
+    // 各座標で最小費用と、最小を取る w の区間
+    int wl[2], wr[2], wc[2], fc[2];
+    for (int d = 0; d < 2; d++) {
+        int A = P.a[d], B = P.b, g = curG[d];
+        int bc = INT_MAX, bw = 0;
+        auto ev = [&](int w) {
+            w = clampi(w, lo[d], hi[d]);
+            int c = fcost(A, B, g, w);
+            if (c < bc || (c == bc && abs(w) < abs(bw))) { bc = c; bw = w; }
+        };
+        ev(0);
+        if (B != 0) { int t = floordiv(g - A, B); ev(t); ev(t + 1); }
+        wc[d] = bw; fc[d] = bc;
+        // 最小値の区間（凸なので二分探索の代わりに広げる：B=±1 のとき広い）
+        if (abs(B) == 1) {
+            // f(w)=|w|+|g-A-Bw|：w が 0 と (g-A)/B の間で一定
+            int e = (g - A) * B;
+            int l = min(0, e), r = max(0, e);
+            l = max(l, lo[d]); r = min(r, hi[d]);
+            if (l <= r && fcost(A, B, g, l) == bc && fcost(A, B, g, r) == bc) { wl[d] = l; wr[d] = r; }
+            else { wl[d] = wr[d] = bw; }
+        } else { wl[d] = wr[d] = bw; }
+    }
+    int baseCost = curCost + depth + fc[0] + fc[1];
+    // 候補の w
+    float bestEv = 1e30f; int bestCost = 0, bw0 = 0, bw1 = 0;
+    auto tryw = [&](int w0, int w1) {
+        w0 = clampi(w0, lo[0], hi[0]); w1 = clampi(w1, lo[1], hi[1]);
+        int c = curCost + depth + fcost(P.a[0], P.b, curG[0], w0) + fcost(P.a[1], P.b, curG[1], w1);
+        if (c > baseCost + SLACK) return;
+        int tk[K][2];
+        for (int k = 0; k < K; k++) { tk[k][0] = tok[k].a[0] + tok[k].b * w0; tk[k][1] = tok[k].a[1] + tok[k].b * w1; }
+        float e = c + LAMBDA * heur(tk);
+        if (e < bestEv) { bestEv = e; bestCost = c; bw0 = w0; bw1 = w1; }
+    };
+    tryw(wc[0], wc[1]);
+    for (int k = 0; k < K; k++) {
+        if (tok[k].b == 0) continue;
+        for (int j = 0; j < nTgt; j++) {
+            int s0 = (int)lround((tgt[j][0] - tok[k].a[0]) / tok[k].b);
+            int s1 = (int)lround((tgt[j][1] - tok[k].a[1]) / tok[k].b);
+            tryw(s0, s1);
+            tryw(clampi(s0, wl[0], wr[0]), clampi(s1, wl[1], wr[1]));
+        }
+    }
+    if (bestEv > 1e29f) return;
+    Cand cd;
+    cd.ev = bestEv; cd.cost = bestCost; cd.parent = curParent;
+    cd.depth = depth; cd.seq = seq;
+    {
+        int p[2] = {curX[0] + bw0, curX[1] + bw1};
+        int tk[K][2]; memcpy(tk, curTk, sizeof(tk));
+        int sq = seq;
+        for (int s = 0; s < depth; s++) {
+            cd.p[s][0] = p[0]; cd.p[s][1] = p[1];
+            int k = sq % 3; sq /= 3;
+            int a = tk[k][0], b = tk[k][1];
+            tk[k][0] = p[0]; tk[k][1] = p[1];
+            p[0] = 2 * a - p[0]; p[1] = 2 * b - p[1];
+        }
+    }
+    outC->push_back(cd);
+}
+
+static void dfs(int depth, int seq, int pw3, const Aff& P, const Aff* tok, const int* lo, const int* hi) {
+    if (depth >= 3) evaluateD(depth, seq, P, tok, lo, hi);
+    if (depth == maxDepth) return;
+    for (int k = 0; k < K; k++) {
+        const Aff& t = tok[k];
+        if (t.b == P.b && t.a[0] == P.a[0] && t.a[1] == P.a[1]) continue;
+        Aff np;
+        np.b = 2 * t.b - P.b;
+        int nlo[2] = {lo[0], lo[1]}, nhi[2] = {hi[0], hi[1]};
+        bool ok = true;
+        for (int d = 0; d < 2; d++) {
+            np.a[d] = 2 * t.a[d] - P.a[d];
+            if (np.b == 0) {
+                if (np.a[d] < 0 || np.a[d] >= N) { ok = false; break; }
+            } else if (np.b > 0) {
+                nlo[d] = max(nlo[d], -floordiv(np.a[d], np.b));
+                nhi[d] = min(nhi[d], floordiv(N - 1 - np.a[d], np.b));
+            } else {
+                int nb = -np.b;
+                nhi[d] = min(nhi[d], floordiv(np.a[d], nb));
+                nlo[d] = max(nlo[d], -floordiv(-(np.a[d] - (N - 1)), nb));
+            }
+            if (nlo[d] > nhi[d]) { ok = false; break; }
+        }
+        if (!ok) continue;
+        Aff ntok[K] = {tok[0], tok[1], tok[2]};
+        ntok[k] = P;
+        dfs(depth + 1, seq + k * pw3, pw3 * 3, np, ntok, nlo, nhi);
+    }
+}
+
 static void apply_leg(const int* x, int tk[K][2], int depth, int seq, const uint8_t pp[][2], const int* g, string* ops) {
     int p[2] = {x[0], x[1]};
     auto walk_to = [&](int ti, int tj) {
@@ -383,7 +486,7 @@ int main() {
     PT[0][0] = S[0]; PT[0][1] = S[1];
     for (int i = 0; i < M; i++) { PT[i + 1][0] = G[i][0]; PT[i + 1][1] = G[i][1]; }
 
-    maxDepth = DEPTH;
+    maxDepth = MAXJ;
     vector<vector<State>> layers(M + 1);
     {
         // 初期配置：最初の数区間の中点の近く + ランダム
@@ -439,6 +542,13 @@ int main() {
             for (int k1 = 0; k1 < K; k1++) {
                 evaluate1(k1);
                 if (DEPTH >= 2) for (int k2 = 0; k2 < K; k2++) evaluate2(k1, k2);
+            }
+            if (si < DEEPF * cur.size()) {
+                Aff P; P.a[0] = x[0]; P.a[1] = x[1]; P.b = 1;
+                Aff tok[K];
+                for (int k = 0; k < K; k++) { tok[k].a[0] = tk[k][0]; tok[k].a[1] = tk[k][1]; tok[k].b = 0; }
+                int lo[2] = {-x[0], -x[1]}, hi[2] = {N - 1 - x[0], N - 1 - x[1]};
+                dfs(0, 0, 1, P, tok, lo, hi);
             }
         }
         sort(cands.begin(), cands.end(), [](const Cand& a, const Cand& b) { return a.ev < b.ev; });
