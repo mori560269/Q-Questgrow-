@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# どの worktree からでも呼べるラッパー
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+exec python3 "$DIR/harness/ahc.py" "$@"
