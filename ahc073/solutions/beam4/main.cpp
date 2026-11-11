@@ -17,6 +17,18 @@ using namespace std;
 #ifndef SPREAD0
 #define SPREAD0 15.0
 #endif
+#ifndef SLACK
+#define SLACK 4
+#endif
+#ifndef WMAX
+#define WMAX 1000000
+#endif
+#ifndef WINIT
+#define WINIT 1000
+#endif
+#ifndef BUDGET
+#define BUDGET 1.80
+#endif
 #ifndef DECAY
 #define DECAY 0.5
 #endif
@@ -70,6 +82,7 @@ static inline int floordiv(int a, int b) {
 // 先読みの評価：次の LOOK 区間について「1 回の転移で行けたら」の費用の見積もり
 static float tgt[LOOK][2];
 static float tgtD[LOOK];
+static float tgtV[LOOK][2];
 static int nTgt;
 static inline float heur(const int tk[K][2]) {
     float h = 0, wt = 1;
@@ -79,6 +92,12 @@ static inline float heur(const int tk[K][2]) {
             float c = 2 * (fabsf(tk[k][0] - tgt[j][0]) + fabsf(tk[k][1] - tgt[j][1])) + 1;
             best = min(best, c);
         }
+#ifdef TRANS
+        for (int a = 0; a < K; a++) for (int b = 0; b < K; b++) if (a != b) {
+            float c = fabsf(tgtV[j][0] - 2 * (tk[b][0] - tk[a][0])) + fabsf(tgtV[j][1] - 2 * (tk[b][1] - tk[a][1])) + 2;
+            best = min(best, c);
+        }
+#endif
         h += wt * best;
         wt *= DECAY;
     }
@@ -123,7 +142,7 @@ static void evaluate(int depth, int seq, const Aff& P, const Aff* tok, const int
     auto tryw = [&](int w0, int w1) {
         w0 = clampi(w0, lo[0], hi[0]); w1 = clampi(w1, lo[1], hi[1]);
         int c = curCost + depth + fcost(P.a[0], P.b, curG[0], w0) + fcost(P.a[1], P.b, curG[1], w1);
-        if (c > baseCost + 4) return;
+        if (c > baseCost + SLACK) return;
         int tk[K][2];
         for (int k = 0; k < K; k++) { tk[k][0] = tok[k].a[0] + tok[k].b * w0; tk[k][1] = tok[k].a[1] + tok[k].b * w1; }
         float e = c + LAMBDA * heur(tk);
@@ -214,6 +233,7 @@ static void setTargets(int leg) {
         tgt[nTgt][0] = (PT[l][0] + PT[l + 1][0]) * 0.5f;
         tgt[nTgt][1] = (PT[l][1] + PT[l + 1][1]) * 0.5f;
         tgtD[nTgt] = abs(PT[l][0] - PT[l + 1][0]) + abs(PT[l][1] - PT[l + 1][1]);
+        tgtV[nTgt][0] = PT[l + 1][0] - PT[l][0]; tgtV[nTgt][1] = PT[l + 1][1] - PT[l][1];
         nTgt++;
     }
 }
@@ -221,7 +241,7 @@ static void setTargets(int leg) {
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-    Timer TM(1.85);
+    Timer TM(BUDGET + 0.05);
     RNG rng;
     int n_, m_, k_;
     cin >> n_ >> m_ >> k_ >> T_in;
@@ -255,8 +275,8 @@ int main() {
             L0.push_back(st);
         }
     }
-    double budget = 1.80;
-    int W = 150;
+    double budget = BUDGET;
+    int W = WINIT;
     vector<Cand> cands;
     outC = &cands;
     for (int i = 0; i < M; i++) {
@@ -306,7 +326,7 @@ int main() {
         double per = (t1 - t0) / max<size_t>(1, cur.size());
         double remain = budget - t1;
         int legs = M - 1 - i;
-        if (legs > 0 && per > 0) W = (int)clamp(remain / legs / per, 5.0, 20000.0);
+        if (legs > 0 && per > 0) W = (int)clamp(remain / legs / per, 5.0, (double)WMAX);
     }
     int bi = 0;
     auto& last = layers[M];
