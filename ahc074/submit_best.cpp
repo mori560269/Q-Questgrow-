@@ -96,6 +96,24 @@ typedef unsigned long long u64;
 #ifndef XBIAS
 #define XBIAS 0
 #endif
+#ifndef OUTSW
+#define OUTSW 0
+#endif
+#ifndef WX
+#define WX 1.0
+#endif
+#ifndef KEEPX
+#define KEEPX 0
+#endif
+#ifndef PORTSIM
+#define PORTSIM 0
+#endif
+#ifndef PEVERY
+#define PEVERY 40
+#endif
+#ifndef PWW
+#define PWW 1.0
+#endif
 
 int N, K, P, R;
 vector<string> A;
@@ -191,12 +209,16 @@ void unpark(int h, u64 tgt) {
     mv(h, (t == cc) ? after(st.front()) : after(st.back()) + 1);
 }
 // ポート lo.. を目標に合わせる。列 c の先頭を前の列の前へ「駐車」してポート (a,c] をまとめて合わせる
+#ifndef PTF
+#define PTF 0
+#endif
 #ifndef PT2
 #define PT2 1
 #endif
 #ifndef PT3
 #define PT3 1
 #endif
+int gPT = PT, gPT2 = PT2, gPT3 = PT3, gDir = 0;
 void parkTo(int h, int j, int c) {
     int d = -1, i2 = 0; bool stg = false;
     for (int x : ord_) { if (x == h) continue; if (kind[x] == 0 || kind[x] == 3) stg = true; if (stg && kind[x] == 1 && parkA[x] == -2 && ovPort[x] > j && ovPort[x] < c) { d = i2; break; } i2++; }
@@ -215,20 +237,29 @@ bool tryParkLoose(int h, int lo, u64 tgt) {
     int gain = 0;
     u64 D = display(h) ^ tgt;
     for (int i = j + 1; i < c; i++) gain += D >> i & 1;
-    if (gain < PT3) return false;
+    if (gain < gPT3) return false;
     parkTo(h, j, c);
     return true;
 #else
     return false;
 #endif
 }
+long long SP[8];
 void fixPorts(int lo, u64 tgt) {
+#ifdef STAT
+    if (lo == 0) { SP[0]++; SP[1] += __builtin_popcountll((display() ^ tgt) & ((1ULL << NPORT) - 1)); }
+#endif
     vector<int> cov(NPORT, 0), pcov(NPORT, 0), pend(NPORT, -1);
     vector<int> pk; for (int k : ord_) if (kind[k] == 1 && parkA[k] != -2) pk.push_back(k);
     auto T = [&](int j) { return (int)(tgt >> j & 1); };
     for (int k : pk) {
         int c = ovPort[k], a = parkA[k];
-        if (a + 1 < lo) continue;
+        if (a + 1 < lo) {
+#if KEEPX
+            for (int j = lo; j <= c; j++) cov[j] = 1;
+#endif
+            continue;
+        }
         bool ok = true; for (int j = a + 1; j <= c; j++) if (colorAt(k, j) != T(j)) ok = false;
         if (ok) { for (int j = a + 1; j <= c; j++) cov[j] = 1; }
         else { pend[c] = k; for (int j = a + 1; j <= c; j++) pcov[j] = 1; }
@@ -246,13 +277,74 @@ void fixPorts(int lo, u64 tgt) {
                 while (j >= lo && !cov[j] && !pcov[j] && colorAt(h, j) == T(j)) j--;
                 int gain = 0;
                 for (int i = j + 1; i < c; i++) { gain += (i > a) ? colorAt(portFront(i), i) != T(i) : (int)(D0 >> i & 1); }
-                if (j < c - 1 && gain >= PT2) { parkAt(h, j, c); continue; }
+                if (j < c - 1 && gain >= gPT2) { parkAt(h, j, c);
+#ifdef STAT
+                    if (lo == 0) SP[2]++;
+#endif
+                    continue; }
             }
             unpark(h, tgt);
+#ifdef STAT
+            if (lo == 0) SP[3]++;
+#endif
     }
 #if PT < 100
     D0 = display() ^ tgt;
-    for (int c = NPORT - 1; c >= lo; c--) {
+    if (gDir == 3) {
+        int n = NPORT - lo;
+        vector<int> f(n + 1, 1 << 29), from(n + 1, -2), hf(n + 1, 0);
+        f[0] = 0;
+        for (int c = lo; c < NPORT; c++) {
+            int i = c - lo;
+            int base = f[i] + (cov[c] ? 0 : (int)(D0 >> c & 1));
+            if (base < f[i + 1]) { f[i + 1] = base; from[i + 1] = -1; }
+            if (cov[c]) continue;
+            vector<int> st = portStack(c);
+            int fl = colorAt(st[0], c) != T(c);
+            int h = st[fl];
+            int j = c - 1;
+            while (j >= lo && !cov[j] && colorAt(h, j) == T(j)) {
+                int v = f[j - lo] + 1 + fl;
+                if (v < f[i + 1]) { f[i + 1] = v; from[i + 1] = j - 1; hf[i + 1] = fl; }
+                j--;
+            }
+        }
+        vector<array<int,3>> ps;
+        for (int i = n; i > 0; ) {
+            if (from[i] == -1) { i--; continue; }
+            int c = lo + i - 1, j = from[i];
+            ps.push_back({c, j, hf[i]});
+            i = j + 1 - lo;
+        }
+        for (auto [c, j, fl] : ps) {
+            vector<int> st = portStack(c);
+            int h = st[fl];
+            if (fl) portFlip(c);
+            parkAt(h, j, c);
+        }
+    } else
+    if (gDir == 2) {
+        while (true) {
+            int bg = -1, bc = -1, bj = -1, bf = 0;
+            for (int c = NPORT - 1; c >= lo; c--) {
+                if (cov[c]) continue;
+                vector<int> st = portStack(c);
+                int fl = colorAt(st[0], c) != T(c);
+                int h = st[fl];
+                int j = c - 1;
+                while (j >= lo && !cov[j] && colorAt(h, j) == T(j)) j--;
+                int gain = 0; for (int i = j + 1; i < c; i++) gain += D0 >> i & 1;
+                if (gain >= gPT && gain > bg) { bg = gain; bc = c; bj = j; bf = fl; }
+            }
+            if (bc < 0) break;
+            vector<int> st = portStack(bc);
+            int h = st[bf];
+            if (bf) portFlip(bc);
+            parkAt(h, bj, bc);
+        }
+    } else
+    for (int ci = 0; ci < NPORT - lo; ci++) {
+        int c = gDir ? lo + ci : NPORT - 1 - ci;
         if (cov[c]) continue;
         int h0 = -1, h1 = -1;
         for (int k : ord_) if (kind[k] == 1 && k != raised && ovPort[k] == c) { if (h0 < 0) h0 = k; else { h1 = k; break; } }
@@ -261,13 +353,20 @@ void fixPorts(int lo, u64 tgt) {
         int j = c - 1;
         while (j >= lo && !cov[j] && colorAt(h, j) == T(j)) j--;
         int gain = 0; for (int i = j + 1; i < c; i++) gain += D0 >> i & 1;
-        if (gain < PT) continue;
+        if (gain < gPT + fl * PTF) continue;
         if (fl) portFlip(c);
         parkAt(h, j, c);
+#ifdef STAT
+        if (lo == 0) { SP[4]++; SP[5] += fl; SP[7] += c - j; }
+#endif
     }
 #endif
     D0 = display() ^ tgt;
-    for (int q = lo; q < NPORT; q++) if (!cov[q] && (D0 >> q & 1)) portFlip(q);
+    for (int q = lo; q < NPORT; q++) if (!cov[q] && (D0 >> q & 1)) { portFlip(q);
+#ifdef STAT
+        if (lo == 0) SP[6]++;
+#endif
+    }
 }
 
 #ifndef MG
@@ -360,7 +459,11 @@ void groundFix(u64 tgt) { for (int g = 0; g < nG; g++) fixGroup(g, tgt); }
 
 
 #ifndef PW
+#if PORTSIM
+#define PW 0.0
+#else
 #define PW 3.0
+#endif
 #endif
 // 状態を 1 度だけ読み、全商品の地紙側の手数を足す
 void groundCostAll(vector<double>& acc) {
@@ -456,7 +559,20 @@ void build(const vector<double>& prio) {
         for (int q = 0; q < NPORT; q++) for (int i = 0; i < (int)plan[q].size(); i++) items.push_back({q, i});
         mt19937 rr(99);
         int M = items.size();
+#if OUTSW
+        vector<int> outs; { vector<int> in(P, 0); for (int q = 0; q < NPORT; q++) for (int u : plan[q]) in[u] = 1; for (int u = 0; u < P; u++) if (!in[u]) outs.push_back(u); }
+#endif
         for (int it = 0; it < COLSW; it++) {
+#if OUTSW
+            if (!outs.empty() && (it & 1)) {
+                auto [p1, i1] = items[rr() % M]; int oi = rr() % outs.size();
+                int u = plan[p1][i1], v = outs[oi];
+                if (A[u][p1] != A[v][p1]) continue;
+                double d = (prio[v] - WX * fc[v][p1]) - (prio[u] - WX * fc[u][p1]);
+                if (d > 0) { plan[p1][i1] = v; outs[oi] = u; }
+                continue;
+            }
+#endif
             auto [p1, i1] = items[rr() % M]; auto [p2, i2] = items[rr() % M];
             if (p1 == p2) continue;
             int u = plan[p1][i1], v = plan[p2][i2];
@@ -486,6 +602,53 @@ void build(const vector<double>& prio) {
     parkA.assign(K, -2);
 }
 
+// 案 Y のポート側の実手数（浮いた上掛けの戻し + fixPorts）。状態は戻す
+int yPortCost(int a) {
+    vector<int> o0 = ord_, p0 = parkA; string s0 = opsOut; int c0 = opsCnt;
+    u64 tgt = TG[a];
+    vector<int> loose;
+    for (int k : ord_) { if (kind[k] == 0 || kind[k] == 3) break; if (kind[k] == 1) loose.push_back(k); }
+    for (int k : loose) {
+        if (tryParkLoose(k, 0, tgt)) continue;
+        int p = ovPort[k], c = colorAt(k, p), t = A[a][p] - '0';
+        vector<int> st; for (int x : ord_) if (x != k && kind[x] == 1 && ovPort[x] == p) st.push_back(x);
+        int pk = posOf(k);
+        auto after = [&](int x) { int i = posOf(x); return i > pk ? i - 1 : i; };
+        mv(k, (t == c) ? after(st.front()) : after(st.back()) + 1);
+    }
+    fixPorts(0, tgt);
+    int r = opsCnt - c0;
+    ord_ = o0; parkA = p0; opsOut = s0; opsCnt = c0;
+    return r;
+}
+#ifndef LAS
+#define LAS 6
+#endif
+#ifndef LAM
+#define LAM 0.0
+#endif
+#ifndef NALT
+#define NALT 8
+#endif
+int gLA = 0; mt19937 larng(4242);
+void fixPortsLA(int lo, u64 tgt, int a) {
+    if (!gLA) { fixPorts(lo, tgt); return; }
+    static const int alt[][3] = {{PT, PT2, 0}, {1, PT2, 0}, {3, PT2, 0}, {100, PT2, 0}, {PT, 100, 0}, {PT, PT2, 1}, {PT, PT2, 2}, {0, PT2, 3}, {1, PT2, 2}, {3, PT2, 2}, {1, PT2, 1}, {3, PT2, 1}};
+    int vs[64]; for (int i = 0; i < LAS; i++) { int v; do v = larng() % P; while (v == a); vs[i] = v; }
+    vector<int> o0 = ord_, p0 = parkA; string s0 = opsOut; int c0 = opsCnt;
+    vector<int> bo, bp; string bs; int bc = 0; double best = 1e18;
+    for (int t = 0; t < NALT; t++) {
+        ord_ = o0; parkA = p0; opsOut = s0; opsCnt = c0;
+        gPT = alt[t][0]; gPT2 = alt[t][1]; gDir = alt[t][2];
+        fixPorts(lo, tgt);
+        gPT = PT; gPT2 = PT2; gDir = 0;
+        double sc = opsCnt - c0, f = 0;
+        if (LAM != 0) { for (int i = 0; i < LAS; i++) f += yPortCost(vs[i]); sc += LAM * f / LAS; }
+        if (sc < best) { best = sc; bo = ord_; bp = parkA; bs = opsOut; bc = opsCnt; }
+    }
+    ord_ = bo; parkA = bp; opsOut = bs; opsCnt = bc;
+}
+long long XS[8];
 long long STX[40], STY[3]; int gcY;
 int serve(int a) {
     opsOut.clear(); opsCnt = 0;
@@ -503,7 +666,7 @@ int serve(int a) {
             int d = (t == c) ? after(st.front()) : after(st.back()) + 1;
             mv(k, d); fixedp[p] = 1;
         }
-        fixPorts(0, tgt);
+        fixPortsLA(0, tgt, a);
         int g0 = opsCnt; groundFix(tgt); gcY = opsCnt - g0;
     }
     int costY = opsCnt - cnt0;
@@ -529,20 +692,50 @@ int serve(int a) {
         }
         {
             vector<int> pk; for (int k : ord_) if (kind[k] == 1 && parkA[k] != -2 && ovPort[k] > p && parkA[k] < p) pk.push_back(k);
-            for (int k : pk) unpark(k, tgt);
+            for (int k : pk) {
+#if KEEPX
+                bool ok = true; for (int j = p + 1; j <= ovPort[k]; j++) if (colorAt(k, j) != (int)(tgt >> j & 1)) ok = false;
+                if (ok) continue;
+#endif
+                unpark(k, tgt);
+            }
         }
         vector<int> st = portStack(p);
         int depth = find(st.begin(), st.end(), ov) - st.begin();
+        int xc0 = opsCnt;
         for (int t = 0; t < depth; t++) portFlip(p);
         mv(ov, 0);
-        fixPorts(p + 1, tgt);
+        int xc1 = opsCnt;
+        fixPortsLA(p + 1, tgt, a);
+        int xc2 = opsCnt;
         int costX = opsCnt - cnt0;
         if (costX + XBIAS >= costY) { ord_ = ordY; parkA = paY; opsOut = outY; opsCnt = cntY; }
 #ifdef STAT
-        else { STX[0]++; STX[1] += costX; STX[2] += costY; STX[3+min(p,29)]++; return opsCnt; }
+        else { XS[0]++; XS[1] += xc0 - cnt0; XS[2] += xc1 - xc0; XS[3] += xc2 - xc1; XS[4] += NPORT - 1 - p; STX[0]++; STX[1] += costX; STX[2] += costY; STX[3+min(p,29)]++; return opsCnt; }
 #endif
     }
     return opsCnt;
+}
+#ifndef SALT
+#define SALT 0
+#endif
+int serveBest(int a) {
+#if SALT
+    static const int alt[][3] = {{PT, PT2, PT3}, {1, PT2, PT3}, {3, PT2, PT3}, {100, PT2, PT3}, {PT, 100, PT3}, {PT, PT2, 100}, {PT, PT2, 2}, {1, 100, PT3}, {3, 100, PT3}, {1, PT2, 100}};
+    vector<int> o0 = ord_, p0 = parkA;
+    vector<int> bo, bp; string bs; int bc = INT_MAX;
+    for (int t = 0; t < SALT; t++) {
+        ord_ = o0; parkA = p0;
+        gPT = alt[t][0]; gPT2 = alt[t][1]; gPT3 = alt[t][2];
+        serve(a);
+        if (opsCnt < bc) { bc = opsCnt; bo = ord_; bp = parkA; bs = opsOut; }
+    }
+    gPT = PT; gPT2 = PT2; gPT3 = PT3;
+    ord_ = bo; parkA = bp; opsOut = bs; opsCnt = bc;
+    return bc;
+#else
+    return serve(a);
+#endif
 }
 #ifndef HW
 #define HW 0
@@ -631,6 +824,7 @@ int main() {
 #endif
     string out; for (auto& s : S) { string o(N, '.'); for (int i = 0; i < N; i++) o[pw[i]] = s[i]; out += o + "\n"; }
     cout << out << flush;
+    gLA = !SALT;
     for (int r = 0; r < R; r++) {
         int a; if (!(cin >> a) || a < 0) return 0;
 #ifdef EXPECT
@@ -642,7 +836,7 @@ int main() {
             if (r == R - 1) fprintf(stderr, "EXPECT = %.1f\n", ex);
         }
 #endif
-        serve(a);
+        serveBest(a);
         if (display() != TG[a]) LOG("mismatch at %d\n", r);
         cout << opsCnt << "\n" << opsOut << flush;
     }
