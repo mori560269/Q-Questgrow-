@@ -1,0 +1,8 @@
+.ahc/
+.lanes/
+# 共有黒板と公式ツールはホームにだけ置く（担当の worktree にはシンボリックリンクで見せる）
+board/
+problem/tools/
+*.out
+a.out
+tools_own/tester

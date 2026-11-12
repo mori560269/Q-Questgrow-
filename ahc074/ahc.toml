@@ -1,0 +1,64 @@
+# ahc-harness 設定ファイル
+# 問題が公開されたら、まずここを埋める（目的の向き・入出力・ツールのパス）。
+# パスはこのファイルがあるディレクトリ（= ホーム）からの相対パス。
+
+[problem]
+name = "ahc074"
+objective = "min"          # 絶対スコア 2KE+T は小さいほど良い
+interactive = true        # インタラクティブ問題なら true（公式 tester を経由して実行）
+time_limit_sec = 2.0       # 問題の実行時間制限
+size_limit_kib = 512       # 提出ソースの上限
+
+[tools]
+# 公式ローカルツール（Rust）を problem/tools に展開し `cargo build -r` しておく。
+input_dir = "problem/tools/in"
+# 非インタラクティブ：解を実行 → score_cmd で採点
+score_cmd = ""
+# インタラクティブ：tester 経由で実行し、stderr からスコアを読む
+tester_cmd = "tools_own/tester {bin}"
+score_regex = 'Score\s*=\s*(-?\d+(?:\.\d+)?)'
+# 入力生成：{seeds} は seed を1行1つ書いたファイル、{out_dir} は出力先
+gen_cmd = "python3 tools_own/gen.py {seeds} {out_dir}"
+
+[build]
+# {src} {out} が置換される。-DAHC_LOCAL でローカル専用のログを有効化できる。
+cmd = "g++ -std=gnu++20 -O2 -DAHC_LOCAL -o {out} {src}"
+# 仮想時計版（templates/timer.hpp の AHC_VIRTUAL_CLOCK）で測るときのフラグ
+virtual_flags = "-DAHC_VIRTUAL_CLOCK"
+
+[eval]
+parallel = 3               # 0 = CPU数-1
+timeout_factor = 3.0       # time_limit_sec × この値で強制終了（TLE判定は time_limit_sec で行う）
+# テスト集合：入力ファイル（ソート順）のインデックス範囲 "開始-終了"（両端含む）
+[eval.sets]
+smoke = "0-9"             # 動作確認
+select = "0-49"           # 選別
+dev = "0-149"              # 手元比較
+full = "0-299"            # 本番相当
+
+[promote]
+# 昇格の線。測定の前に決めておき、結果を見てから動かさない（変えたら decisions.md に理由を書く）。
+set = "dev"
+min_rel_gain = 0.0005      # 相対スコアの平均改善がこれ以上
+min_z = 2.0                # 対応のある差の z 値がこれ以上
+max_errors = 0             # 実行エラー（RE/WA/スコア取得失敗）の許容件数
+max_tle = 0                # time_limit_sec 超過の許容件数
+
+[features]
+# 入力1行目のトークンに名前を付ける（observe stats でケースを層に分けるのに使う）
+header = ["N", "K", "P", "R"]
+
+[agents]
+# lane start で tmux 窓に起動するコマンド。{prompt_file} は初回指示ファイル。
+claude = "claude \"$(cat {prompt_file})\""
+codex = "codex \"$(cat {prompt_file})\""
+advisor = "codex exec \"$(cat {prompt_file})\""
+tmux_session = "ahc"
+# pump：返答が止まった担当へ送る続行の文
+continue_message = "続けて。STRATEGY.md と notes.md を読み直し、次の最小の実験を1つ進めて結果を notes.md に追記して。改善が出たら ahc handoff で提出して。"
+idle_cycles = 2            # 画面が何周変わらなければ「止まった」とみなして続行を送るか
+stall_cycles = 10          # 何周変わらなければ「進まない」と判定して通知するか
+
+[notify]
+# 通知コマンド（任意）。{message} が置換される。例: curl -d "{message}" ntfy.sh/your-topic
+cmd = ""
