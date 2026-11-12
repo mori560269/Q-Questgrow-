@@ -4,7 +4,7 @@ import { Icon } from "../components/Icon";
 import { StatusChip } from "../components/SessionCard";
 import { confirmDialog } from "../components/ConfirmDialog";
 import { toast } from "../components/Toast";
-import { SESSIONS, ZONES } from "../data/event";
+import { EVENT, SESSIONS, ZONES } from "../data/event";
 import { draftAnnouncement } from "../lib/api";
 import { CATEGORY_LABEL } from "../lib/nlp";
 import { actions, effective, liveState, nowMinutes, seatsLeft, useStore, type Announcement, type Inquiry } from "../lib/store";
@@ -92,12 +92,12 @@ function ClockControl() {
     <div style={{ marginTop: 12, position: "relative", zIndex: 1 }}>
       <div className="row between small">
         <span>当日時刻（デモ）: <b style={{ fontSize: 16 }}>{fmt(now)}</b></span>
-        <button className="chip" style={{ border: 0 }} onClick={() => actions.setClock(s.clock === null ? 710 : null)}>
+        <button className="chip" style={{ border: 0 }} onClick={() => actions.setClock(s.clock === null ? EVENT.doorsOpen + 140 : null)}>
           {s.clock === null ? "デモ時刻に切替" : "実時刻に切替"}
         </button>
       </div>
       {s.clock !== null && (
-        <input type="range" min={570} max={1110} step={5} value={s.clock} onChange={(e) => actions.setClock(Number(e.target.value))} aria-label="デモ時刻" />
+        <input type="range" min={EVENT.doorsOpen} max={EVENT.closes} step={5} value={s.clock} onChange={(e) => actions.setClock(Number(e.target.value))} aria-label="デモ時刻" />
       )}
     </div>
   );

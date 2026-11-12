@@ -4,12 +4,18 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "content": "tsx scripts/build-content.ts",
+    "predev": "npm run content --silent",
     "dev": "concurrently -n web,api -c cyan,magenta \"vite\" \"tsx watch --env-file-if-exists=.env server/index.ts\"",
     "dev:web": "vite",
     "dev:api": "tsx watch --env-file-if-exists=.env server/index.ts",
+    "prebuild": "npm run content --silent",
     "build": "tsc -b && vite build",
+    "prestart": "npm run content --silent",
     "start": "NODE_ENV=production tsx --env-file-if-exists=.env server/index.ts",
+    "pretypecheck": "npm run content --silent",
     "typecheck": "tsc -b",
+    "pretest": "npm run content --silent",
     "test": "vitest run"
   },
   "dependencies": {
@@ -19,6 +25,7 @@
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^7.18.5",
+    "yaml": "^2.9.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

@@ -2,3 +2,4 @@ node_modules
 dist
 .env
 *.tsbuildinfo
+src/data/content.generated.json

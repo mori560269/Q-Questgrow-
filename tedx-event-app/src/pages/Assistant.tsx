@@ -3,7 +3,7 @@ import { Icon } from "../components/Icon";
 import { RichText } from "../components/RichText";
 import { SubHeader } from "../components/SubHeader";
 import { toast } from "../components/Toast";
-import { SESSIONS, ZONES } from "../data/event";
+import { EVENT, SESSIONS, ZONES } from "../data/event";
 import { askConcierge, checkAi, triage, type ChatTurn } from "../lib/api";
 import { CATEGORY_LABEL, triageLocally } from "../lib/nlp";
 import { actions, effective, getState, myBookings, nowMinutes, seatsLeft, useStore, type State } from "../lib/store";
@@ -33,7 +33,7 @@ type Turn = ChatTurn & { source?: "ai" | "local" };
 export function AssistantPage() {
   const [mode, setMode] = useState<"ai" | "staff">("ai");
   const [turns, setTurns] = useState<Turn[]>([
-    { role: "assistant", content: "こんにちは！TEDxQuestgrow の AI コンシェルジュです ✨\nプログラム選び、会場の場所、当日の疑問など、なんでも聞いてください。" },
+    { role: "assistant", content: `こんにちは！${EVENT.name} の AI コンシェルジュです ✨\nプログラム選び、会場の場所、当日の疑問など、なんでも聞いてください。` },
   ]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);

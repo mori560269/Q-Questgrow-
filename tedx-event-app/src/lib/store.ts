@@ -3,7 +3,7 @@
 // 本番ではここを API + WebSocket（または Firestore 等）に置き換える。
 
 import { useSyncExternalStore } from "react";
-import { PEOPLE, SESSIONS, type Person, type Session } from "../data/event";
+import { EVENT, PEOPLE, SESSIONS, type Person, type Session } from "../data/event";
 import { cancel as cancelLedger, emptyLedger, reserve as reserveLedger, type Ledger } from "./reservation";
 import type { Triage } from "./nlp";
 
@@ -76,13 +76,13 @@ function initialState(): State {
     checkins: {},
     attendance: { s1: 512, s2: 498 },
     announcements: [
-      { id: uid(), at: 575, ja: "ようこそ TEDxQuestgrow 2026 へ！会場Wi-Fi: TEDxQuestgrow-Guest / PW: growbeyond", en: "Welcome! Wi-Fi: TEDxQuestgrow-Guest / PW: growbeyond", level: "info" },
+      { id: uid(), at: EVENT.doorsOpen, ja: EVENT.welcomeJa, en: EVENT.welcomeEn || EVENT.welcomeJa, level: "info" },
     ],
     inquiries: [],
     connections: {},
     messages: [],
     notices: [],
-    clock: 710,
+    clock: EVENT.doorsOpen + 140,
   };
 }
 

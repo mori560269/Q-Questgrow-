@@ -26,9 +26,7 @@ export function HomePage() {
         <div className="hero-top">
           <Link to="/me" className="row" style={{ gap: 8 }}>
             <Avatar name={s.me.name} hue={s.me.hue} size={36} />
-            <div className="brand">
-              TED<b>x</b> Questgrow
-            </div>
+            <Brand name={EVENT.name} />
           </Link>
           <button className="icon-btn" onClick={() => nav("/notices")} aria-label="通知">
             <Icon name="bell" />
@@ -206,4 +204,11 @@ export function crowdLabel(v: number) {
 function posterBg(color: string, seed: string) {
   const h = [...seed].reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
   return `radial-gradient(120% 90% at 100% 0%, ${color}, transparent 60%), radial-gradient(100% 100% at 0% 100%, hsl(${h} 70% 45%), transparent 70%), #141a3a`;
+}
+
+/** イベント名から年を除いてロゴ風に表示（TEDx で始まる場合は x を赤に） */
+function Brand({ name }: { name: string }) {
+  const short = name.replace(/\s*\d{4}$/, "");
+  const m = short.match(/^TED(x)(.*)$/);
+  return <div className="brand">{m ? <>TED<b>x</b>{m[2]}</> : short}</div>;
 }
