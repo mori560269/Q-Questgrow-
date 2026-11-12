@@ -1,4 +1,4 @@
-// nest: 列 p の上掛けはポート 0..p で不透明、列ブロックは p の昇順
+// nest + 上掛け商品を模擬計算の地紙手数で選ぶ
 #include <bits/stdc++.h>
 // timer.hpp — 実時間タイマーと「仮想時計」
 //
@@ -84,13 +84,16 @@ typedef unsigned long long u64;
 #ifndef SLOPE
 #define SLOPE 5.0
 #endif
+#ifndef COLSW
+#define COLSW 200000
+#endif
 #ifndef XBIAS
 #define XBIAS 0
 #endif
 
 int N, K, P, R;
 vector<string> A;
-vector<u64> OPQ, BLK;
+vector<u64> OPQ, BLK, TG;
 vector<int> ord_;          // 上から順の紙番号
 vector<int> kind;          // 0: 1マス紙, 1: 上掛け, 2: 全部穴
 vector<int> pixWin, pixCol;  // 1マス紙の窓と色
@@ -134,6 +137,7 @@ vector<int> portStack(int p) {
     for (int k : ord_) if (kind[k] == 1 && k != raised && ovPort[k] == p) v.push_back(k);
     return v;
 }
+int portFront(int p) { for (int k : ord_) if (kind[k] == 1 && k != raised && ovPort[k] == p) return k; return -1; }
 // 上掛けをポートの列に戻す（色が交互になる位置へ）
 void putBack(int k) {
     int p = ovPort[k];
@@ -253,37 +257,54 @@ int groundCost(u64 tgt) {
 }
 void groundFix(u64 tgt) { for (int g = 0; g < nG; g++) fixGroup(g, tgt); }
 
-int main() {
-    cin >> N >> K >> P >> R;
-    A.resize(P); for (auto& a : A) cin >> a;
-    // ポートにする窓を選ぶ: 上掛けのない商品のポート内の黒が少なくなるように
-    vector<int> pw(N); iota(pw.begin(), pw.end(), 0);
-    {
-        int nNo = P - (K - (N - NPORT) - MG);
-        mt19937 rng(12345);
-        vector<int> in(N, 0); for (int j = 0; j < NPORT; j++) in[j] = 1;
-        vector<int> b(P, 0);
-        for (int u = 0; u < P; u++) for (int j = 0; j < N; j++) if (in[j]) b[u] += A[u][j] - '0';
-        auto eval = [&]() { vector<int> t = b; nth_element(t.begin(), t.begin() + nNo, t.end()); long long s = 0; for (int i = 0; i < nNo; i++) s += t[i]; return s; };
-        long long cur = eval();
-        for (int it = 0; it < 20000; it++) {
-            int x = rng() % N, y = rng() % N;
-            if (in[x] == in[y]) continue;
-            if (!in[x]) swap(x, y);  // x: ポート -> 外す, y: 入れる
-            for (int u = 0; u < P; u++) b[u] += (A[u][y] - '0') - (A[u][x] - '0');
-            long long nv = eval();
-            if (nv <= cur) { cur = nv; in[x] = 0; in[y] = 1; }
-            else for (int u = 0; u < P; u++) b[u] -= (A[u][y] - '0') - (A[u][x] - '0');
+
+
+#ifndef PW
+#define PW 3.0
+#endif
+// 状態を 1 度だけ読み、全商品の地紙側の手数を足す
+void groundCostAll(vector<double>& acc) {
+    static int Lw[8][64], Ln[8], Lc[8];
+    for (int g = 0; g < nG; g++) {
+        int G = GR[g]; Ln[g] = 0; Lc[g] = 0; bool seen = false;
+        for (int k : ord_) {
+            if (k == G) { seen = true; continue; }
+            if (kind[k] == 0 && grpOf[pixWin[k]] == g) { Lw[g][Ln[g]++] = pixWin[k]; if (!seen) Lc[g]++; }
         }
-        int c = 0; for (int j = 0; j < N; j++) if (in[j]) pw[c++] = j;
-        for (int j = 0; j < N; j++) if (!in[j]) pw[c++] = j;
-        for (auto& a : A) { string t(N, '0'); for (int i = 0; i < N; i++) t[i] = a[pw[i]]; a = t; }
     }
-    // 窓 0..NPORT-1 をポートにする
+    int pre[66];
+    u64 disp = display(), pmask = (1ULL << NPORT) - 1;
+    for (int u = 0; u < P; u++) {
+        u64 tgt = TG[u]; int s = 0;
+        for (int g = 0; g < nG; g++) {
+            int n = Ln[g], c = Lc[g], B = 0; pre[0] = 0; int dstar = -1;
+            for (int i = 0; i < n; i++) { int x = tgt >> Lw[g][i] & 1; pre[i + 1] = pre[i] + !x; B += x; if (x && i >= c) dstar = i + 1; }
+            int best = INT_MAX;
+            if (dstar < 0) {
+                for (int t = 0; t <= n; t++) {
+                    if (t < c && c == n && pre[t] == 0) continue;
+                    int v = (t != c) + pre[t] + (B - (t - pre[t])); if (v < best) best = v;
+                }
+            } else {
+                for (int t = dstar; t <= n; t++) { int v = 1 + pre[t] + (B - (t - pre[t])); if (v < best) best = v; }
+                for (int t = 0; t < dstar; t++) {
+                    if (dstar == n && pre[t] == 0) continue;
+                    int v = 2 + pre[t] + (B - (t - pre[t])); if (v < best) best = v;
+                }
+            }
+            s += best;
+        }
+        acc[u] += s + PW * __builtin_popcountll((disp ^ tgt) & pmask);
+    }
+}
+vector<int> pw;
+vector<string> S;
+// 設計を作る（prio の大きい商品から上掛けを割り当てる）
+void build(const vector<double>& prio) {
+    S.clear(); kind.clear(); pixWin.clear(); pixCol.clear(); ovTarget.clear(); ovPort.clear(); GR.clear();
+    raised = -1;
     isPort.assign(N, 0);
     for (int j = 0; j < NPORT; j++) isPort[j] = 1;
-    vector<string> S;
-    // 黒の 1 マス紙（ポート以外の窓）と白の地紙
     for (int j = 0; j < N; j++) if (!isPort[j]) {
         string s(N, '.'); s[j] = '1'; S.push_back(s); kind.push_back(0); pixWin.push_back(j); pixCol.push_back(1); ovTarget.push_back(-1); ovPort.push_back(-1);
     }
@@ -299,12 +320,9 @@ int main() {
     }
     int npix = S.size();
     int nov = K - npix;
-    // 上掛け: 各ポートに nov/NPORT 枚、ポートでの色が半々になるよう割り当て
     ovOf.assign(P, -1);
-    vector<int> used(P, 0);
     int pairs = nov / 2;
     vector<vector<int>> plan(NPORT);
-    vector<array<int,2>> quota(NPORT);
     vector<int> perPairs(NPORT);
     {
         double ws = 0; for (int p = 0; p < NPORT; p++) ws += 1 + SLOPE * p;
@@ -312,20 +330,39 @@ int main() {
         for (int p = 0; p < NPORT; p++) { cum += (1 + SLOPE * p) / ws * pairs; int t = (int)llround(cum); perPairs[p] = max(1, t - acc); acc += perPairs[p]; }
         perPairs[NPORT - 1] -= acc - pairs;
     }
+    vector<array<int,2>> quota(NPORT);
     for (int p = 0; p < NPORT; p++) {
         int per = 2 * perPairs[p];
         quota[p] = {(per + 1) / 2, per / 2};
     }
     vector<int> pr(P); iota(pr.begin(), pr.end(), 0);
-    auto sc = [&](int u) { int c = 0; for (int j = 0; j < NPORT; j++) c += A[u][j] - '0'; return c; };
-    stable_sort(pr.begin(), pr.end(), [&](int x, int y) { return sc(x) > sc(y); });
+    stable_sort(pr.begin(), pr.end(), [&](int x, int y) { return prio[x] > prio[y]; });
     for (int u : pr) {
         int bp = -1;
         for (int p = 0; p < NPORT; p++) { int c = A[u][p] - '0'; if (quota[p][c] > 0 && (bp < 0 || quota[p][c] > quota[bp][A[u][bp] - '0'])) bp = p; }
         if (bp < 0) continue;
-        quota[bp][A[u][bp] - '0']--; used[u] = 1; plan[bp].push_back(u);
+        quota[bp][A[u][bp] - '0']--; plan[bp].push_back(u);
     }
-    // 交互の色に並べる
+#if COLSW
+    {
+        vector<int> cb(NPORT, 0); for (int u = 0; u < P; u++) for (int q = 0; q < NPORT; q++) cb[q] += A[u][q] - '0';
+        // fc[u][p] = 列 p に置いたときの直しの期待数
+        vector<array<double, 32>> fc(P);
+        for (int u = 0; u < P; u++) { double acc = 0; for (int q = NPORT - 1; q >= 0; q--) { fc[u][q] = acc; int x = A[u][q] - '0'; acc += (x ? P - cb[q] : cb[q]) / (double)P; } }
+        vector<pair<int,int>> items; // (列, 添字)
+        for (int q = 0; q < NPORT; q++) for (int i = 0; i < (int)plan[q].size(); i++) items.push_back({q, i});
+        mt19937 rr(99);
+        int M = items.size();
+        for (int it = 0; it < COLSW; it++) {
+            auto [p1, i1] = items[rr() % M]; auto [p2, i2] = items[rr() % M];
+            if (p1 == p2) continue;
+            int u = plan[p1][i1], v = plan[p2][i2];
+            if (A[u][p1] != A[v][p1] || A[u][p2] != A[v][p2]) continue;
+            double d = fc[v][p1] + fc[u][p2] - fc[u][p1] - fc[v][p2];
+            if (d < 0) swap(plan[p1][i1], plan[p2][i2]);
+        }
+    }
+#endif
     for (int p = 0; p < NPORT; p++) {
         vector<int> z, o; for (int u : plan[p]) (A[u][p] == '0' ? z : o).push_back(u);
         vector<int> seq; for (size_t i = 0; i < max(z.size(), o.size()); i++) { if (i < z.size()) seq.push_back(z[i]); if (i < o.size()) seq.push_back(o[i]); }
@@ -340,60 +377,147 @@ int main() {
     while ((int)S.size() < K) { S.push_back(string(N, '.')); kind.push_back(2); pixWin.push_back(-1); pixCol.push_back(-1); ovTarget.push_back(-1); ovPort.push_back(-1); }
     bfreq.assign(K, 0);
     for (int k = 0; k < K; k++) if (kind[k] == 0) for (int u = 0; u < P; u++) if (ovOf[u] < 0) bfreq[k] += A[u][pixWin[k]] - '0';
-    string out; for (auto& s : S) { string o(N, '.'); for (int i = 0; i < N; i++) o[pw[i]] = s[i]; out += o + "\n"; }
-    cout << out << flush;
-    OPQ.resize(K); BLK.resize(K);
-    for (int k = 0; k < K; k++) { OPQ[k] = BLK[k] = 0; for (int j = 0; j < N; j++) { if (S[k][j] != '.') OPQ[k] |= 1ULL << j; if (S[k][j] == '1') BLK[k] |= 1ULL << j; } }
+    OPQ.assign(K, 0); BLK.assign(K, 0);
+    for (int k = 0; k < K; k++) { for (int j = 0; j < N; j++) { if (S[k][j] != '.') OPQ[k] |= 1ULL << j; if (S[k][j] == '1') BLK[k] |= 1ULL << j; } }
     ord_.resize(K); iota(ord_.begin(), ord_.end(), 0);
+}
 
-    for (int r = 0; r < R; r++) {
-        int a; if (!(cin >> a) || a < 0) return 0;
-        opsOut.clear(); opsCnt = 0;
-        u64 tgt = 0; for (int j = 0; j < N; j++) if (A[a][j] == '1') tgt |= 1ULL << j;
-        vector<int> ord0 = ord_; string out0 = opsOut; int cnt0 = opsCnt;
-        // 案 Y: 浮いている上掛けをポート列へ戻し（色が合う側へ）、ポートと地紙で直す
+long long STX[40], STY[3]; int gcY;
+int serve(int a) {
+    opsOut.clear(); opsCnt = 0;
+    u64 tgt = TG[a];
+    vector<int> ord0 = ord_; string out0 = opsOut; int cnt0 = opsCnt;
+    {
+        vector<int> loose, fixedp(NPORT, 0);
+        for (int k : ord_) { if (kind[k] == 0 || kind[k] == 3) break; if (kind[k] == 1) loose.push_back(k); }
+        for (int k : loose) {
+            int p = ovPort[k], c = colorAt(k, p), t = A[a][p] - '0';
+            vector<int> st; for (int x : ord_) if (x != k && kind[x] == 1 && ovPort[x] == p) st.push_back(x);
+            int pk = posOf(k);
+            auto after = [&](int x) { int i = posOf(x); return i > pk ? i - 1 : i; };
+            int d = (t == c) ? after(st.front()) : after(st.back()) + 1;
+            mv(k, d); fixedp[p] = 1;
+        }
+        for (int q = 0; q < NPORT; q++) if (!fixedp[q] && colorAt(portFront(q), q) != A[a][q] - '0') portFlip(q);
+        int g0 = opsCnt; groundFix(tgt); gcY = opsCnt - g0;
+    }
+    int costY = opsCnt - cnt0;
+#ifdef STAT
+    STY[0]++; STY[1] += costY; STY[2] += gcY;
+#endif
+    int ov = ovOf[a];
+    if (ov >= 0) {
+        vector<int> ordY = ord_; string outY = opsOut; int cntY = opsCnt;
+        ord_ = ord0; opsOut = out0; opsCnt = cnt0;
+        int p = ovPort[ov];
         {
-            vector<int> loose, fixedp(NPORT, 0);
+            vector<int> loose;
             for (int k : ord_) { if (kind[k] == 0 || kind[k] == 3) break; if (kind[k] == 1) loose.push_back(k); }
-            for (int k : loose) {
-                int p = ovPort[k], c = colorAt(k, p), t = A[a][p] - '0';
-                vector<int> st; for (int x : ord_) if (x != k && kind[x] == 1 && ovPort[x] == p) st.push_back(x);
+            for (int k : loose) if (ovPort[k] > p) {
+                int pl = ovPort[k], c = colorAt(k, pl), t = A[a][pl] - '0';
+                vector<int> st; for (int x : ord_) if (x != k && kind[x] == 1 && ovPort[x] == pl) st.push_back(x);
                 int pk = posOf(k);
                 auto after = [&](int x) { int i = posOf(x); return i > pk ? i - 1 : i; };
-                int d = (t == c) ? after(st.front()) : after(st.back()) + 1;
-                mv(k, d); fixedp[p] = 1;
+                mv(k, (t == c) ? after(st.front()) : after(st.back()) + 1);
             }
-            for (int q = 0; q < NPORT; q++) if (!fixedp[q] && colorAt(portStack(q).front(), q) != A[a][q] - '0') portFlip(q);
-            groundFix(tgt);
         }
-        int costY = opsCnt - cnt0;
-        int ov = ovOf[a];
-        if (ov >= 0) {
-            vector<int> ordY = ord_; string outY = opsOut; int cntY = opsCnt;
-            ord_ = ord0; opsOut = out0; opsCnt = cnt0;
-            int p = ovPort[ov];
-            {
-                vector<int> loose;
-                for (int k : ord_) { if (kind[k] == 0 || kind[k] == 3) break; if (kind[k] == 1) loose.push_back(k); }
-                for (int k : loose) if (ovPort[k] > p) {
-                    int pl = ovPort[k], c = colorAt(k, pl), t = A[a][pl] - '0';
-                    vector<int> st; for (int x : ord_) if (x != k && kind[x] == 1 && ovPort[x] == pl) st.push_back(x);
-                    int pk = posOf(k);
-                    auto after = [&](int x) { int i = posOf(x); return i > pk ? i - 1 : i; };
-                    mv(k, (t == c) ? after(st.front()) : after(st.back()) + 1);
-                }
-            }
-            vector<int> st = portStack(p);
-            int depth = find(st.begin(), st.end(), ov) - st.begin();
-            for (int t = 0; t < depth; t++) portFlip(p);
-            mv(ov, 0);
-            for (int q = p + 1; q < NPORT; q++) {
-                if (colorAt(portStack(q).front(), q) != (A[a][q] - '0')) portFlip(q);
-            }
-            int costX = opsCnt - cnt0;
-            if (costX + XBIAS >= costY) { ord_ = ordY; opsOut = outY; opsCnt = cntY; }
+        vector<int> st = portStack(p);
+        int depth = find(st.begin(), st.end(), ov) - st.begin();
+        for (int t = 0; t < depth; t++) portFlip(p);
+        mv(ov, 0);
+        for (int q = p + 1; q < NPORT; q++) {
+            if (colorAt(portFront(q), q) != (A[a][q] - '0')) portFlip(q);
         }
-        if (display() != tgt) LOG("mismatch at %d\n", r);
+        int costX = opsCnt - cnt0;
+        if (costX + XBIAS >= costY) { ord_ = ordY; opsOut = outY; opsCnt = cntY; }
+#ifdef STAT
+        else { STX[0]++; STX[1] += costX; STX[2] += costY; STX[3+min(p,29)]++; return opsCnt; }
+#endif
+    }
+    return opsCnt;
+}
+#ifndef HW
+#define HW 0
+#endif
+#ifndef HB
+#define HB 1
+#endif
+#ifndef BL
+#define BL 0.0
+#endif
+#ifndef SIMIT
+#define SIMIT 3
+#endif
+#ifndef SIMSTEP
+#define SIMSTEP 3000
+#endif
+#ifndef SIMEVERY
+#define SIMEVERY 2
+#endif
+
+int main() {
+    cin >> N >> K >> P >> R;
+    A.resize(P); for (auto& a : A) cin >> a;
+    pw.resize(N); iota(pw.begin(), pw.end(), 0);
+    {
+        int nNo = P - (K - (N - NPORT) - MG);
+        mt19937 rng(12345);
+        vector<int> in(N, 0); for (int j = 0; j < NPORT; j++) in[j] = 1;
+        vector<int> b(P, 0);
+        vector<int> cb(N, 0); for (int u = 0; u < P; u++) for (int j = 0; j < N; j++) cb[j] += A[u][j] - '0';
+        auto wc = [&](int u, int j) { int x = A[u][j] - '0'; return HW * (x ? P - cb[j] : cb[j]) + HB * P * x; };
+        for (int u = 0; u < P; u++) for (int j = 0; j < N; j++) if (in[j]) b[u] += wc(u, j);
+        auto eval = [&]() { vector<int> t = b; nth_element(t.begin(), t.begin() + nNo, t.end()); long long s = 0; for (int i = 0; i < nNo; i++) s += t[i]; return s; };
+        long long cur = eval();
+        for (int it = 0; it < 20000; it++) {
+            int x = rng() % N, y = rng() % N;
+            if (in[x] == in[y]) continue;
+            if (!in[x]) swap(x, y);
+            for (int u = 0; u < P; u++) b[u] += wc(u, y) - wc(u, x);
+            long long nv = eval();
+            if (nv <= cur) { cur = nv; in[x] = 0; in[y] = 1; }
+            else for (int u = 0; u < P; u++) b[u] -= wc(u, y) - wc(u, x);
+        }
+        int c = 0; for (int j = 0; j < N; j++) if (in[j]) pw[c++] = j;
+        for (int j = 0; j < N; j++) if (!in[j]) pw[c++] = j;
+        for (auto& a : A) { string t(N, '0'); for (int i = 0; i < N; i++) t[i] = a[pw[i]]; a = t; }
+    }
+    TG.assign(P, 0);
+    for (int u = 0; u < P; u++) for (int j = 0; j < N; j++) if (A[u][j] == '1') TG[u] |= 1ULL << j;
+    vector<double> prio(P);
+    for (int u = 0; u < P; u++) { int c = 0; for (int j = 0; j < NPORT; j++) c += A[u][j] - '0'; prio[u] = c; }
+    vector<double> prio0 = prio;
+    build(prio);
+    mt19937 srng(777);
+    for (int it = 0; it < SIMIT; it++) {
+        vector<double> acc(P, 0); int ns = 0;
+        int prev = srng() % P;
+        for (int s = 0; s < SIMSTEP; s++) {
+            int a; do a = srng() % P; while (a == prev);
+            serve(a); prev = a;
+            if (s >= 200 && s % SIMEVERY == 0) {
+                groundCostAll(acc);
+                ns++;
+            }
+        }
+        vector<double> np(P);
+        for (int u = 0; u < P; u++) np[u] = acc[u] / ns + BL * prio0[u] + 1e-3 * prio[u];
+        prio = np;
+        build(prio);
+    }
+#ifdef STAT
+    memset(STX,0,sizeof STX); memset(STY,0,sizeof STY);
+#endif
+    string out; for (auto& s : S) { string o(N, '.'); for (int i = 0; i < N; i++) o[pw[i]] = s[i]; out += o + "\n"; }
+    cout << out << flush;
+    for (int r = 0; r < R; r++) {
+        int a; if (!(cin >> a) || a < 0) return 0;
+        serve(a);
+        if (display() != TG[a]) LOG("mismatch at %d\n", r);
         cout << opsCnt << "\n" << opsOut << flush;
     }
+#ifdef STAT
+    fprintf(stderr, "Yall n=%lld avg=%.2f ground=%.2f | Xused n=%lld costX=%.2f (Y would %.2f)\n", STY[0], (double)STY[1]/STY[0], (double)STY[2]/STY[0], STX[0], (double)STX[1]/STX[0], (double)STX[2]/STX[0]);
+    for (int p = 0; p < NPORT; p++) fprintf(stderr, "%lld ", STX[3+p]); fprintf(stderr, "\n");
+#endif
 }
