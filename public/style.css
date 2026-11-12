@@ -1,0 +1,92 @@
+:root {
+  --bg: #f6f7f9; --fg: #1b1f24; --muted: #6a737d; --card: #fff; --line: #e1e4e8;
+  --accent: #2563eb; --ok: #16a34a; --ng: #dc2626; --warn: #d97706;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1216; --fg: #e6e8eb; --muted: #9aa4af; --card: #181c22; --line: #2b313a; --accent: #4c8dff; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 10px 14px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button.danger { color: var(--ng); }
+button:disabled { opacity: .5; cursor: default; }
+input, select { border: 1px solid var(--line); background: var(--card); border-radius: 10px; padding: 10px 12px; width: 100%; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.grow { flex: 1; min-width: 0; }
+
+/* ログイン */
+.login { max-width: 360px; margin: 15vh auto; padding: 0 16px; }
+.login h1 { font-size: 20px; }
+.login form { display: grid; gap: 12px; }
+.err { color: var(--ng); min-height: 1.2em; }
+
+/* スキャン画面 */
+.scan-header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line); padding: 8px 12px; }
+.scan-header .title { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scan-header select { width: auto; padding: 6px 10px; }
+.net { font-size: 12px; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.net.on { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.net.off { background: color-mix(in srgb, var(--ng) 18%, transparent); color: var(--ng); }
+.counter { font-size: 13px; color: var(--muted); padding: 6px 12px; display: flex; justify-content: space-between; }
+.reader-wrap { padding: 0 12px; }
+#reader { width: 100%; max-width: 520px; margin: 0 auto; border-radius: 14px; overflow: hidden; background: #000; min-height: 240px; }
+#reader video { border-radius: 14px; }
+.scan-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; max-width: 544px; margin: 0 auto; }
+.banner { margin: 8px 12px; padding: 10px 12px; border-radius: 10px; font-size: 14px; background: color-mix(in srgb, var(--warn) 18%, var(--card)); border: 1px solid var(--warn); }
+
+/* 結果オーバーレイ(画面全体の色で判定を伝える) */
+.result { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; color: #fff; }
+.result.ok { background: var(--ok); }
+.result.duplicate, .result.invalid { background: var(--ng); }
+.result.cancelled, .result.offline-unknown { background: var(--warn); }
+.result .icon { font-size: 96px; line-height: 1; }
+.result .head { font-size: 40px; font-weight: 800; margin: 12px 0 4px; }
+.result .sub { font-size: 20px; opacity: .95; }
+.result .name { font-size: 26px; font-weight: 700; margin-top: 18px; }
+.result .type { display: inline-block; margin-top: 8px; padding: 4px 14px; border-radius: 999px; background: rgba(255,255,255,.25); font-size: 20px; font-weight: 700; }
+.result .tap { position: absolute; bottom: 24px; font-size: 14px; opacity: .8; }
+
+/* 手動受付パネル */
+.sheet { position: fixed; inset: 0; z-index: 40; background: var(--bg); display: flex; flex-direction: column; }
+.sheet .bar { padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--card); }
+.sheet .list { overflow: auto; padding: 12px; display: grid; gap: 8px; align-content: start; }
+.item { display: flex; gap: 10px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.item .meta { font-size: 13px; color: var(--muted); word-break: break-all; }
+.chip { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.chip.ok { color: var(--ok); border-color: var(--ok); }
+.chip.ng { color: var(--ng); border-color: var(--ng); }
+.chip.warn { color: var(--warn); border-color: var(--warn); }
+
+/* 管理画面 */
+.admin { max-width: 1100px; margin: 0 auto; padding: 16px; }
+.admin header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.admin h1 { font-size: 20px; margin: 0; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi .label { font-size: 13px; color: var(--muted); }
+.kpi .value { font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.kpi .value small { font-size: 16px; color: var(--muted); font-weight: 600; }
+.progress { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: 8px; }
+.progress > div { height: 100%; background: var(--ok); transition: width .4s; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.card h2 { font-size: 15px; margin: 0 0 12px; }
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 140px; border-bottom: 1px solid var(--line); }
+.bars > div { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 1px; position: relative; }
+.bars-x { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 4px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; }
+td.actions { display: flex; gap: 6px; }
+td.actions button { padding: 4px 10px; font-size: 13px; }
+.mono { font-family: ui-monospace, Menlo, monospace; }
+.tools { display: grid; gap: 12px; }
+.tools .card p { margin: 0 0 10px; font-size: 14px; }
+pre.code { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 13px; overflow-x: auto; margin: 0 0 10px; }

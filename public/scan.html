@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>入場チェック</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <template id="tpl-main">
+    <div class="scan-header">
+      <div class="row">
+        <div class="title grow" id="event-name">入場チェック</div>
+        <span class="net on" id="net">オンライン</span>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <select id="gate" aria-label="ゲート"></select>
+        <span class="muted grow" style="font-size:12px" id="pending"></span>
+        <button id="logout" style="padding:6px 10px;font-size:13px">ログアウト</button>
+      </div>
+    </div>
+    <div class="counter"><span id="count">入場 - / -</span><span id="last-sync"></span></div>
+    <div id="banners"></div>
+    <div class="reader-wrap"><div id="reader"></div></div>
+    <p class="muted" id="cam-msg" style="text-align:center;font-size:14px;margin:8px 12px"></p>
+    <div class="scan-actions">
+      <button id="btn-manual" class="primary">番号・名前で探す</button>
+      <button id="btn-camera">カメラ再起動</button>
+    </div>
+  </template>
+
+  <script src="/vendor/html5-qrcode.min.js"></script>
+  <script type="module" src="/scan.js"></script>
+</body>
+</html>
