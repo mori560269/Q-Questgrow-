@@ -1,4 +1,4 @@
-// port2: port1 の 1 マス紙を「黒の 1 マス紙 + 白の地紙 1 枚」に置き換え、浮いた紙を上掛けへ
+// nest: 列 p の上掛けはポート 0..p で不透明、列ブロックは p の昇順
 #include <bits/stdc++.h>
 // timer.hpp — 実時間タイマーと「仮想時計」
 //
@@ -79,7 +79,10 @@ using namespace std;
 typedef unsigned long long u64;
 
 #ifndef NPORT
-#define NPORT 12
+#define NPORT 30
+#endif
+#ifndef SLOPE
+#define SLOPE 5.0
 #endif
 #ifndef XBIAS
 #define XBIAS 0
@@ -302,8 +305,15 @@ int main() {
     int pairs = nov / 2;
     vector<vector<int>> plan(NPORT);
     vector<array<int,2>> quota(NPORT);
+    vector<int> perPairs(NPORT);
+    {
+        double ws = 0; for (int p = 0; p < NPORT; p++) ws += 1 + SLOPE * p;
+        int acc = 0; double cum = 0;
+        for (int p = 0; p < NPORT; p++) { cum += (1 + SLOPE * p) / ws * pairs; int t = (int)llround(cum); perPairs[p] = max(1, t - acc); acc += perPairs[p]; }
+        perPairs[NPORT - 1] -= acc - pairs;
+    }
     for (int p = 0; p < NPORT; p++) {
-        int per = 2 * (pairs / NPORT + (p < pairs % NPORT ? 1 : 0));
+        int per = 2 * perPairs[p];
         quota[p] = {(per + 1) / 2, per / 2};
     }
     vector<int> pr(P); iota(pr.begin(), pr.end(), 0);
@@ -323,7 +333,7 @@ int main() {
     }
     for (int p = 0; p < NPORT; p++) for (int u : plan[p]) {
         string s = A[u];
-        for (int j = 0; j < NPORT; j++) if (j != p) s[j] = '.';
+        for (int j = p + 1; j < NPORT; j++) s[j] = '.';
         ovOf[u] = S.size();
         S.push_back(s); kind.push_back(1); pixWin.push_back(-1); pixCol.push_back(-1); ovTarget.push_back(u); ovPort.push_back(p);
     }
@@ -362,11 +372,22 @@ int main() {
             vector<int> ordY = ord_; string outY = opsOut; int cntY = opsCnt;
             ord_ = ord0; opsOut = out0; opsCnt = cnt0;
             int p = ovPort[ov];
+            {
+                vector<int> loose;
+                for (int k : ord_) { if (kind[k] == 0 || kind[k] == 3) break; if (kind[k] == 1) loose.push_back(k); }
+                for (int k : loose) if (ovPort[k] > p) {
+                    int pl = ovPort[k], c = colorAt(k, pl), t = A[a][pl] - '0';
+                    vector<int> st; for (int x : ord_) if (x != k && kind[x] == 1 && ovPort[x] == pl) st.push_back(x);
+                    int pk = posOf(k);
+                    auto after = [&](int x) { int i = posOf(x); return i > pk ? i - 1 : i; };
+                    mv(k, (t == c) ? after(st.front()) : after(st.back()) + 1);
+                }
+            }
             vector<int> st = portStack(p);
             int depth = find(st.begin(), st.end(), ov) - st.begin();
             for (int t = 0; t < depth; t++) portFlip(p);
             mv(ov, 0);
-            for (int q = 0; q < NPORT; q++) if (q != p) {
+            for (int q = p + 1; q < NPORT; q++) {
                 if (colorAt(portStack(q).front(), q) != (A[a][q] - '0')) portFlip(q);
             }
             int costX = opsCnt - cnt0;
