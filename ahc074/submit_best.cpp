@@ -79,7 +79,7 @@ using namespace std;
 typedef unsigned long long u64;
 
 #ifndef NPORT
-#define NPORT 42
+#define NPORT 43
 #endif
 #ifndef SLOPE
 #define SLOPE 1.0
@@ -541,6 +541,14 @@ void build(const vector<double>& prio) {
         int per = 2 * perPairs[p];
         quota[p] = {(per + 1) / 2, per / 2};
     }
+#ifdef PPENV
+    if (getenv("PPT")) {
+        string t = getenv("PPT"); for (auto& ch : t) if (ch == ',') ch = ' ';
+        istringstream is(t); int tot = 0;
+        for (int p = 0; p < NPORT; p++) { int n = 0; is >> n; quota[p] = {(n + 1) / 2, n / 2}; tot += n; }
+        assert(tot <= nov);
+    }
+#endif
     vector<int> pr(P); iota(pr.begin(), pr.end(), 0);
     stable_sort(pr.begin(), pr.end(), [&](int x, int y) { return prio[x] > prio[y]; });
     for (int u : pr) {
@@ -827,12 +835,19 @@ int main() {
     gLA = !SALT;
     for (int r = 0; r < R; r++) {
         int a; if (!(cin >> a) || a < 0) return 0;
+#ifndef EXPK
+#define EXPK 1
+#endif
 #ifdef EXPECT
         {
-            static int prevA = -1; static double ex = 0; vector<int> o0 = ord_, q0 = parkA;
-            double t = 0; int c = 0;
-            for (int u = 0; u < P; u++) if (u != prevA) { t += serve(u); c++; ord_ = o0; parkA = q0; }
-            ex += t / c; prevA = a;
+            static int prevA = -1; static double ex = 0;
+            if (r % EXPK == 0) {
+                vector<int> o0 = ord_, q0 = parkA;
+                double t = 0; int c = 0;
+                for (int u = 0; u < P; u++) if (u != prevA) { t += serve(u); c++; ord_ = o0; parkA = q0; }
+                ex += t / c * EXPK;
+            }
+            prevA = a;
             if (r == R - 1) fprintf(stderr, "EXPECT = %.1f\n", ex);
         }
 #endif
