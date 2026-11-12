@@ -1,9 +1,0 @@
-{
-  "name": "入場チェック",
-  "short_name": "入場チェック",
-  "start_url": "/scan",
-  "display": "standalone",
-  "background_color": "#0f1216",
-  "theme_color": "#2563eb",
-  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
-}
