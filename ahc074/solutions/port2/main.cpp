@@ -7,6 +7,9 @@ typedef unsigned long long u64;
 #ifndef NPORT
 #define NPORT 13
 #endif
+#ifndef XBIAS
+#define XBIAS 0
+#endif
 
 int N, K, P, R;
 vector<string> A;
@@ -170,7 +173,7 @@ int main() {
             }
             costX = depth + 1 + pf;
         }
-        if (costX < costY) {
+        if (ov >= 0 && costX + XBIAS < costY) {
             int p = ovPort[ov];
             for (int t = 0; t < depth; t++) portFlip(p);
             mv(ov, 0); raised = ov;
