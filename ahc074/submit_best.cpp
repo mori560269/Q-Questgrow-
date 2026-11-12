@@ -82,7 +82,13 @@ typedef unsigned long long u64;
 #define NPORT 42
 #endif
 #ifndef SLOPE
-#define SLOPE 5.0
+#define SLOPE 1.0
+#endif
+#ifndef EXPO
+#define EXPO 1.5
+#endif
+#ifndef PPSORT
+#define PPSORT 1
 #endif
 #ifndef COLSW
 #define COLSW 200000
@@ -117,12 +123,14 @@ bool visible(int k) {
     return ex != 0;
 }
 // 紙 k を抜いて、抜いた後の並びの d 番目に入れる
+bool SIMM = false;
 void mv(int k, int d) {
-    assert(visible(k));
+    if (!SIMM) assert(visible(k));
     int p = posOf(k);
     ord_.erase(ord_.begin() + p);
     ord_.insert(ord_.begin() + d, k);
-    opsOut += to_string(k) + " " + to_string(d) + "\n"; opsCnt++;
+    if (!SIMM) opsOut += to_string(k) + " " + to_string(d) + "\n";
+    opsCnt++;
     parkA[k] = -2;
 }
 u64 display(int ex = -1) {
@@ -156,11 +164,10 @@ void putBack(int k) {
     mv(k, d);
 }
 // ポート p の色を変える（先頭を列の末尾の後ろへ）
+int portBackPos(int p) { for (int i = (int)ord_.size() - 1; i >= 0; i--) { int k = ord_[i]; if (kind[k] == 1 && k != raised && ovPort[k] == p) return i; } return -1; }
 void portFlip(int p) {
-    vector<int> st = portStack(p);
-    int x = st.front();
-    int last = st.back();
-    int d = posOf(last);  // 抜くと last の位置が 1 つ前にずれるので、その後ろ = 元の posOf(last)
+    int x = portFront(p);
+    int d = portBackPos(p);  // 抜くと last の位置が 1 つ前にずれるので、その後ろ = 元の posOf(last)
     mv(x, d);
 }
 void pixFlip(int j) {
@@ -247,9 +254,10 @@ void fixPorts(int lo, u64 tgt) {
     D0 = display() ^ tgt;
     for (int c = NPORT - 1; c >= lo; c--) {
         if (cov[c]) continue;
-        vector<int> st = portStack(c);
-        int fl = colorAt(st[0], c) != T(c);
-        int h = st[fl];
+        int h0 = -1, h1 = -1;
+        for (int k : ord_) if (kind[k] == 1 && k != raised && ovPort[k] == c) { if (h0 < 0) h0 = k; else { h1 = k; break; } }
+        int fl = colorAt(h0, c) != T(c);
+        int h = fl ? h1 : h0;
         int j = c - 1;
         while (j >= lo && !cov[j] && colorAt(h, j) == T(j)) j--;
         int gain = 0; for (int i = j + 1; i < c; i++) gain += D0 >> i & 1;
@@ -417,10 +425,13 @@ void build(const vector<double>& prio) {
     vector<vector<int>> plan(NPORT);
     vector<int> perPairs(NPORT);
     {
-        double ws = 0; for (int p = 0; p < NPORT; p++) ws += 1 + SLOPE * p;
+        double ws = 0; for (int p = 0; p < NPORT; p++) ws += 1 + SLOPE * pow(p, EXPO);
         int acc = 0; double cum = 0;
-        for (int p = 0; p < NPORT; p++) { cum += (1 + SLOPE * p) / ws * pairs; int t = (int)llround(cum); perPairs[p] = max(1, t - acc); acc += perPairs[p]; }
+        for (int p = 0; p < NPORT; p++) { cum += (1 + SLOPE * pow(p, EXPO)) / ws * pairs; int t = (int)llround(cum); perPairs[p] = max(1, t - acc); acc += perPairs[p]; }
         perPairs[NPORT - 1] -= acc - pairs;
+#if PPSORT
+        sort(perPairs.begin(), perPairs.end());
+#endif
     }
     vector<array<int,2>> quota(NPORT);
     for (int p = 0; p < NPORT; p++) {
@@ -548,11 +559,16 @@ int serve(int a) {
 #ifndef SIMSTEP
 #define SIMSTEP 3000
 #endif
+#ifndef SIMTL
+#define SIMTL 0.9
+#endif
 #ifndef SIMEVERY
-#define SIMEVERY 2
+#define SIMEVERY 4
 #endif
 
 int main() {
+    auto T0 = chrono::steady_clock::now();
+    auto el = [&]() { return chrono::duration<double>(chrono::steady_clock::now() - T0).count(); };
     cin >> N >> K >> P >> R;
     A.resize(P); for (auto& a : A) cin >> a;
     pw.resize(N); iota(pw.begin(), pw.end(), 0);
@@ -586,10 +602,13 @@ int main() {
     vector<double> prio0 = prio;
     build(prio);
     mt19937 srng(777);
+    SIMM = true;
     for (int it = 0; it < SIMIT; it++) {
         vector<double> acc(P, 0); int ns = 0;
         int prev = srng() % P;
+        bool late = false;
         for (int s = 0; s < SIMSTEP; s++) {
+            if (s % 64 == 0 && el() > SIMTL) { late = true; break; }
             int a; do a = srng() % P; while (a == prev);
             serve(a); prev = a;
             if (s >= 200 && s % SIMEVERY == 0) {
@@ -597,22 +616,39 @@ int main() {
                 ns++;
             }
         }
+        if (late && ns < 100) { build(prio); break; }
         vector<double> np(P);
         for (int u = 0; u < P; u++) np[u] = acc[u] / ns + BL * prio0[u] + 1e-3 * prio[u];
         prio = np;
         build(prio);
     }
+    SIMM = false;
 #ifdef STAT
     memset(STX,0,sizeof STX); memset(STY,0,sizeof STY);
+#endif
+#if defined(EXPECT) || defined(TIMING)
+    fprintf(stderr, "SIMTIME = %.3f\n", (double)clock() / CLOCKS_PER_SEC);
 #endif
     string out; for (auto& s : S) { string o(N, '.'); for (int i = 0; i < N; i++) o[pw[i]] = s[i]; out += o + "\n"; }
     cout << out << flush;
     for (int r = 0; r < R; r++) {
         int a; if (!(cin >> a) || a < 0) return 0;
+#ifdef EXPECT
+        {
+            static int prevA = -1; static double ex = 0; vector<int> o0 = ord_, q0 = parkA;
+            double t = 0; int c = 0;
+            for (int u = 0; u < P; u++) if (u != prevA) { t += serve(u); c++; ord_ = o0; parkA = q0; }
+            ex += t / c; prevA = a;
+            if (r == R - 1) fprintf(stderr, "EXPECT = %.1f\n", ex);
+        }
+#endif
         serve(a);
         if (display() != TG[a]) LOG("mismatch at %d\n", r);
         cout << opsCnt << "\n" << opsOut << flush;
     }
+#ifdef TIMING
+    fprintf(stderr, "TOTAL = %.3f\n", (double)clock() / CLOCKS_PER_SEC);
+#endif
 #ifdef STAT
     fprintf(stderr, "Yall n=%lld avg=%.2f ground=%.2f | Xused n=%lld costX=%.2f (Y would %.2f)\n", STY[0], (double)STY[1]/STY[0], (double)STY[2]/STY[0], STX[0], (double)STX[1]/STX[0], (double)STX[2]/STX[0]);
     for (int p = 0; p < NPORT; p++) fprintf(stderr, "%lld ", STX[3+p]); fprintf(stderr, "\n");
