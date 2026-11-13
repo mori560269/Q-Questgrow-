@@ -91,7 +91,10 @@ typedef unsigned long long u64;
 #define PPSORT 1
 #endif
 #ifndef COLSW
-#define COLSW 200000
+#define COLSW 600000
+#endif
+#ifndef ZR
+#define ZR 12
 #endif
 #ifndef XBIAS
 #define XBIAS 0
@@ -669,15 +672,22 @@ void build(const vector<double>& prio) {
         vector<int> cb(NPORT, 0); for (int u = 0; u < P; u++) for (int q = 0; q < NPORT; q++) cb[q] += A[u][q] - '0';
         // fc[u][p] = 列 p に置いたときの直しの期待数
         vector<array<double, 64>> fc(P);
-        for (int u = 0; u < P; u++) { double acc = 0; for (int q = NPORT - 1; q >= 0; q--) { fc[u][q] = acc; int x = A[u][q] - '0'; acc += (x ? P - cb[q] : cb[q]) / (double)P; } }
         vector<pair<int,int>> items; // (列, 添字)
         for (int q = 0; q < NPORT; q++) for (int i = 0; i < (int)plan[q].size(); i++) items.push_back({q, i});
         mt19937 rr(99);
         int M = items.size();
+        for (int zr = 0; zr < ZR; zr++) {
+        vector<double> bq(NPORT);
+        if (zr == 0) for (int q = 0; q < NPORT; q++) bq[q] = cb[q] / (double)P;
+        else {
+            vector<int> col(P, -1); for (int q = 0; q < NPORT; q++) for (int u : plan[q]) col[u] = q;
+            for (int q = 0; q < NPORT; q++) { double s = 0, c = 0; for (int u = 0; u < P; u++) if (col[u] < q) { s += A[u][q] - '0'; c++; } bq[q] = s / c; }
+        }
+        for (int u = 0; u < P; u++) { double acc = 0; for (int q = NPORT - 1; q >= 0; q--) { fc[u][q] = acc; int x = A[u][q] - '0'; acc += x ? 1 - bq[q] : bq[q]; } }
 #if OUTSW
         vector<int> outs; { vector<int> in(P, 0); for (int q = 0; q < NPORT; q++) for (int u : plan[q]) in[u] = 1; for (int u = 0; u < P; u++) if (!in[u]) outs.push_back(u); }
 #endif
-        for (int it = 0; it < COLSW; it++) {
+        for (int it = 0; it < COLSW / ZR; it++) {
 #if OUTSW
             if (!outs.empty() && (it & 1)) {
                 auto [p1, i1] = items[rr() % M]; int oi = rr() % outs.size();
@@ -694,6 +704,7 @@ void build(const vector<double>& prio) {
             if (A[u][p1] != A[v][p1] || A[u][p2] != A[v][p2]) continue;
             double d = fc[v][p1] + fc[u][p2] - fc[u][p1] - fc[v][p2];
             if (d < 0) swap(plan[p1][i1], plan[p2][i2]);
+        }
         }
     }
 #endif
@@ -793,7 +804,7 @@ void fixPortsLA(int lo, u64 tgt, int a) {
 #define XPW 0.0
 #endif
 double parkPen() { double s = 0; for (int k : ord_) if (kind[k] == 1 && parkA[k] != -2) s += MU + MU2 * (ovPort[k] - parkA[k]); return s; }
-long long XS[8];
+long long XS[8]; long long ZS[2][8]; int gLastX = 0;
 long long STX[40], STY[3]; int gcY;
 int serve(int a) {
     opsOut.clear(); opsCnt = 0;
@@ -844,15 +855,21 @@ int serve(int a) {
         for (int t = 0; t < depth; t++) portFlip(p);
         mv(ov, 0);
         int xc1 = opsCnt;
+#ifdef STAT
+        int mmR = __builtin_popcountll((display() ^ tgt) & ((1ULL << NPORT) - 1) & ~((2ULL << p) - 1));
+#endif
         fixPortsLA(p + 1, tgt, a);
         int xc2 = opsCnt;
         int costX = opsCnt - cnt0;
         double penX = parkPen(), penY = 0; { vector<int> t = ord_, q = parkA; ord_ = ordY; parkA = paY; penY = parkPen(); ord_ = t; parkA = q; }
         if (costX + XBIAS + XPW * (penX - penY) >= costY) { ord_ = ordY; parkA = paY; opsOut = outY; opsCnt = cntY; }
 #ifdef STAT
-        else { XS[0]++; XS[1] += xc0 - cnt0; XS[2] += xc1 - xc0; XS[3] += xc2 - xc1; XS[4] += NPORT - 1 - p; STX[0]++; STX[1] += costX; STX[2] += costY; STX[3+min(p,29)]++; return opsCnt; }
+        else { int ty = gLastX; ZS[ty][0]++; ZS[ty][1] += xc2 - xc1; ZS[ty][2] += mmR; ZS[ty][3] += NPORT - 1 - p; ZS[ty][4] += xc0 - cnt0; ZS[ty][5] += xc1 - xc0; gLastX = 1; XS[0]++; XS[1] += xc0 - cnt0; XS[2] += xc1 - xc0; XS[3] += xc2 - xc1; XS[4] += NPORT - 1 - p; STX[0]++; STX[1] += costX; STX[2] += costY; STX[3+min(p,29)]++; return opsCnt; }
 #endif
     }
+#ifdef STAT
+    gLastX = 0;
+#endif
     return opsCnt;
 }
 #ifndef SALT
@@ -956,7 +973,7 @@ int main() {
     }
     SIMM = false;
 #ifdef STAT
-    memset(STX,0,sizeof STX); memset(STY,0,sizeof STY);
+    memset(STX,0,sizeof STX); memset(STY,0,sizeof STY); memset(ZS,0,sizeof ZS); gLastX=0;
 #endif
 #if defined(EXPECT) || defined(TIMING)
     fprintf(stderr, "SIMTIME = %.3f\n", (double)clock() / CLOCKS_PER_SEC);
@@ -994,6 +1011,7 @@ int main() {
 #endif
 #ifdef STAT
     fprintf(stderr, "Yall n=%lld avg=%.2f ground=%.2f | Xused n=%lld costX=%.2f (Y would %.2f)\n", STY[0], (double)STY[1]/STY[0], (double)STY[2]/STY[0], STX[0], (double)STX[1]/STX[0], (double)STX[2]/STX[0]);
+    for (int t = 0; t < 2; t++) fprintf(stderr, "prev%s n=%lld rearfix=%.2f rearmis=%.2f L=%.2f pre=%.2f depth+1=%.2f\n", t ? "X" : "Y", ZS[t][0], (double)ZS[t][1]/ZS[t][0], (double)ZS[t][2]/ZS[t][0], (double)ZS[t][3]/ZS[t][0], (double)ZS[t][4]/ZS[t][0], (double)ZS[t][5]/ZS[t][0]);
     for (int p = 0; p < NPORT; p++) fprintf(stderr, "%lld ", STX[3+p]); fprintf(stderr, "\n");
 #endif
 }
