@@ -244,8 +244,115 @@ bool tryParkLoose(int h, int lo, u64 tgt) {
     return false;
 #endif
 }
+vector<int> gLoose;
+void handleLoose(int lo, u64 tgt) {
+    for (int k : gLoose) { if (tryParkLoose(k, lo, tgt)) continue; unpark(k, tgt); }
+    gLoose.clear();
+}
 long long SP[8];
+
+#ifndef LOOSEDP
+#define LOOSEDP 1
+#endif
+#ifndef DMU2B
+#define DMU2B 0.3
+#endif
+#ifndef DMUC
+#define DMUC 1.0
+#endif
+#ifndef DMU
+#define DMU 0.0
+#endif
+#ifndef DMU2
+#define DMU2 0.1
+#endif
+double gDMU = DMU, gDMU2 = DMU2;
+void fixPortsDP(int lo, u64 tgt) {
+    auto T = [&](int j) { return (int)(tgt >> j & 1); };
+    int ex[64], f0[64], f1[64];
+    for (int c = 0; c < NPORT; c++) ex[c] = f0[c] = f1[c] = -1;
+    vector<int> fixedLow;
+    vector<char> isL(K, 0);
+    if (lo == 0) for (int k : gLoose) { if (ex[ovPort[k]] < 0) { ex[ovPort[k]] = k; isL[k] = 1; } }
+    { vector<int> rest; for (int k : gLoose) if (!isL[k]) rest.push_back(k); gLoose = rest; handleLoose(lo, tgt); }
+    for (int k : ord_) if (kind[k] == 1 && k != raised && !isL[k]) {
+        int c = ovPort[k];
+        if (parkA[k] != -2) { if (parkA[k] + 1 >= lo) ex[c] = k; else fixedLow.push_back(k); continue; }
+        if (f0[c] < 0) f0[c] = k; else if (f1[c] < 0) f1[c] = k;
+    }
+    vector<int> blocked(NPORT, 0);
+    for (int k : fixedLow) for (int j = lo; j <= ovPort[k]; j++) blocked[j] = 1;
+    int n = NPORT - lo;
+    vector<double> f(n + 1, 1e18); vector<int> fj(n + 1, -9), fk(n + 1, -1), ff(n + 1, 0);
+    f[0] = 0;
+    for (int c = lo; c < NPORT; c++) {
+        int i = c - lo;
+        double sv = blocked[c] ? 0 : (ex[c] >= 0 ? 0 : (colorAt(f0[c], c) != T(c)));
+        if (f[i] + sv < f[i + 1]) { f[i + 1] = f[i] + sv; fk[i + 1] = -1; }
+        if (blocked[c]) continue;
+        int cand[2], cc[2], nc = 0;
+        if (ex[c] >= 0) { cand[nc] = ex[c]; cc[nc++] = 0; }
+        else { cand[nc] = f0[c]; cc[nc++] = 1; if (f1[c] >= 0) { cand[nc] = f1[c]; cc[nc++] = 2; } }
+        for (int t = 0; t < nc; t++) {
+            int h = cand[t];
+            if (colorAt(h, c) != T(c)) continue;
+            for (int j = c - 1; j >= lo && !blocked[j] && colorAt(h, j) == T(j) && !(isL[h] && ex[j] >= 0); j--) {
+                // segment (j-1, c]
+                int b = j - 1;
+                if (c - b < 2) continue;
+                double cost = cc[t];
+                if (cc[t] == 0 && b == parkA[h]) cost = -1;
+                cost += gDMU + gDMU2 * (c - b);
+                double v = f[j - lo] + cost;
+                if (v < f[i + 1]) { f[i + 1] = v; fj[i + 1] = b; fk[i + 1] = h; ff[i + 1] = cc[t]; }
+            }
+        }
+    }
+    vector<array<int,4>> segs;
+    for (int i = n; i > 0; ) {
+        if (fk[i] == -1) { i--; continue; }
+        int c = lo + i - 1;
+        segs.push_back({c, fj[i], fk[i], ff[i]});
+        i = fj[i] + 1 - lo;
+    }
+    int nex = 0; for (int c = lo; c < NPORT; c++) nex += ex[c] >= 0;
+    int oc0 = opsCnt;
+    u64 Dpre = display() ^ tgt;
+    vector<int> used(K, 0);
+    for (auto& s : segs) if (s[3] == 0) used[s[2]] = 1;
+    {
+        vector<int> segOf(K, -9); for (auto& s : segs) if (s[3] == 0) segOf[s[2]] = s[1];
+        vector<int> pend;
+        for (int k : ord_) if (isL[k] && segOf[k] == -9) pend.push_back(k);
+        for (int c = NPORT - 1; c >= lo; c--) if (ex[c] >= 0 && !isL[ex[c]] && segOf[ex[c]] == -9) pend.push_back(ex[c]);
+        for (int k : ord_) if (isL[k] && segOf[k] != -9) pend.push_back(k);
+        for (int c = NPORT - 1; c >= lo; c--) if (ex[c] >= 0 && !isL[ex[c]] && segOf[ex[c]] != -9 && segOf[ex[c]] != parkA[ex[c]]) pend.push_back(ex[c]);
+        while (!pend.empty()) {
+            int i = 0; while (i + 1 < (int)pend.size() && !visible(pend[i])) i++;
+            int k = pend[i]; pend.erase(pend.begin() + i);
+            if (segOf[k] == -9) unpark(k, tgt); else parkTo(k, segOf[k], ovPort[k]);
+        }
+    }
+    for (auto& s : segs) if (s[3] != 0) {
+        if (s[3] == 2) portFlip(s[0]);
+        assert(portFront(s[0]) == s[2] || parkA[portFront(s[0])] != -2);
+        parkTo(s[2], s[1], s[0]);
+    }
+    u64 D0 = display() ^ tgt;
+#ifdef ASTAT
+    if (!SIMM) { static int cnt = 0; if (cnt++ < 3) { fprintf(stderr, "segs:"); for (auto& s : segs) fprintf(stderr, " (%d,%d] k%d t%d", s[1], s[0], s[2], s[3]); fprintf(stderr, "\nD:"); for (int q = lo; q < NPORT; q++) fprintf(stderr, "%d", (int)(D0 >> q & 1)); fprintf(stderr, " ops %d\nP:", opsCnt - oc0); for (int q = lo; q < NPORT; q++) fprintf(stderr, "%d", (int)(Dpre >> q & 1));fprintf(stderr, "\nF:"); for (int q = lo; q < NPORT; q++) fprintf(stderr, "%d", colorAt(f0[q],q)!=T(q)); fprintf(stderr, "\n");} }
+#endif
+    vector<int> cov(NPORT, 0);
+    for (int k : ord_) if (kind[k] == 1 && parkA[k] != -2) for (int j = max(lo, parkA[k] + 1); j <= ovPort[k]; j++) cov[j] = 1;
+    for (int q = lo; q < NPORT; q++) if (!cov[q] && (D0 >> q & 1)) portFlip(q);
+#ifdef ASTAT
+    if (!SIMM && fabs(opsCnt - oc0 - (f[n] + nex)) > 1e-6) { static int cnt = 0; if (cnt++ < 5) fprintf(stderr, "pred %.1f act %d nex %d\n", f[n] + nex, opsCnt - oc0, nex); }
+#endif
+}
 void fixPorts(int lo, u64 tgt) {
+    if (gDir >= 4) {
+        if (gDir == 5) gDMU2 = DMU2B; if (gDir == 6) gDMU = DMUC;
+        fixPortsDP(lo, tgt); gDMU = DMU; gDMU2 = DMU2; return; }
 #ifdef STAT
     if (lo == 0) { SP[0]++; SP[1] += __builtin_popcountll((display() ^ tgt) & ((1ULL << NPORT) - 1)); }
 #endif
@@ -635,27 +742,57 @@ int yPortCost(int a) {
 #ifndef LAM
 #define LAM 0.0
 #endif
-#ifndef NALT
-#define NALT 8
+#ifndef ALT0
+#define ALT0 0
 #endif
-int gLA = 0; mt19937 larng(4242);
+#ifndef NALT
+#define NALT 9
+#endif
+#ifndef MU
+#define MU 0.0
+#endif
+#ifndef MU2
+#define MU2 0.1
+#endif
+long long ACOST[16], ABEST; int gLA = 0;
+int serve(int a);
+double evalNext(int lo, u64 tgt, const int* vs) {
+    vector<int> o0 = ord_, p0 = parkA; string s0 = opsOut; int c0 = opsCnt;
+    bool sm = SIMM; SIMM = true; int la = gLA; gLA = 0;
+    if (lo == 0) groundFix(tgt);
+    vector<int> o1 = ord_, p1 = parkA;
+    double f = 0;
+    for (int i = 0; i < LAS; i++) { ord_ = o1; parkA = p1; f += serve(vs[i]); }
+    ord_ = o0; parkA = p0; opsOut = s0; opsCnt = c0; SIMM = sm; gLA = la;
+    return f;
+}
+mt19937 larng(4242);
 void fixPortsLA(int lo, u64 tgt, int a) {
     if (!gLA) { fixPorts(lo, tgt); return; }
-    static const int alt[][3] = {{PT, PT2, 0}, {1, PT2, 0}, {3, PT2, 0}, {100, PT2, 0}, {PT, 100, 0}, {PT, PT2, 1}, {PT, PT2, 2}, {0, PT2, 3}, {1, PT2, 2}, {3, PT2, 2}, {1, PT2, 1}, {3, PT2, 1}};
+    static const int alt[][3] = {{PT, PT2, 0}, {1, PT2, 0}, {3, PT2, 0}, {100, PT2, 0}, {PT, 100, 0}, {PT, PT2, 1}, {PT, PT2, 2}, {0, PT2, 3}, {0, 0, 4}, {0, 0, 5}, {0, 0, 6}, {1, PT2, 2}, {3, PT2, 2}, {1, PT2, 1}, {3, PT2, 1}};
     int vs[64]; for (int i = 0; i < LAS; i++) { int v; do v = larng() % P; while (v == a); vs[i] = v; }
     vector<int> o0 = ord_, p0 = parkA; string s0 = opsOut; int c0 = opsCnt;
+    vector<int> L0 = gLoose;
     vector<int> bo, bp; string bs; int bc = 0; double best = 1e18;
-    for (int t = 0; t < NALT; t++) {
-        ord_ = o0; parkA = p0; opsOut = s0; opsCnt = c0;
+    for (int t = ALT0; t < NALT; t++) {
+        ord_ = o0; parkA = p0; opsOut = s0; opsCnt = c0; gLoose = L0;
         gPT = alt[t][0]; gPT2 = alt[t][1]; gDir = alt[t][2];
+        if (gDir < 4) handleLoose(lo, tgt); else if (lo != 0) gLoose.clear();
         fixPorts(lo, tgt);
         gPT = PT; gPT2 = PT2; gDir = 0;
         double sc = opsCnt - c0, f = 0;
-        if (LAM != 0) { for (int i = 0; i < LAS; i++) f += yPortCost(vs[i]); sc += LAM * f / LAS; }
+        if (MU != 0 || MU2 != 0) { for (int k : ord_) if (kind[k] == 1 && parkA[k] != -2) sc += MU + MU2 * (ovPort[k] - parkA[k]); }
+        if (LAM != 0) { f = evalNext(lo, tgt, vs); sc += LAM * f / LAS; }
+        if (lo == 0) ACOST[t] += opsCnt - c0;
         if (sc < best) { best = sc; bo = ord_; bp = parkA; bs = opsOut; bc = opsCnt; }
     }
+    if (lo == 0) ABEST += bc - c0;
     ord_ = bo; parkA = bp; opsOut = bs; opsCnt = bc;
 }
+#ifndef XPW
+#define XPW 0.0
+#endif
+double parkPen() { double s = 0; for (int k : ord_) if (kind[k] == 1 && parkA[k] != -2) s += MU + MU2 * (ovPort[k] - parkA[k]); return s; }
 long long XS[8];
 long long STX[40], STY[3]; int gcY;
 int serve(int a) {
@@ -665,15 +802,8 @@ int serve(int a) {
     {
         vector<int> loose, fixedp(NPORT, 0);
         for (int k : ord_) { if (kind[k] == 0 || kind[k] == 3) break; if (kind[k] == 1) loose.push_back(k); }
-        for (int k : loose) {
-            if (tryParkLoose(k, 0, tgt)) continue;
-            int p = ovPort[k], c = colorAt(k, p), t = A[a][p] - '0';
-            vector<int> st; for (int x : ord_) if (x != k && kind[x] == 1 && ovPort[x] == p) st.push_back(x);
-            int pk = posOf(k);
-            auto after = [&](int x) { int i = posOf(x); return i > pk ? i - 1 : i; };
-            int d = (t == c) ? after(st.front()) : after(st.back()) + 1;
-            mv(k, d); fixedp[p] = 1;
-        }
+        gLoose = loose;
+        if (!gLA || !LOOSEDP) handleLoose(0, tgt);
         fixPortsLA(0, tgt, a);
         int g0 = opsCnt; groundFix(tgt); gcY = opsCnt - g0;
     }
@@ -717,7 +847,8 @@ int serve(int a) {
         fixPortsLA(p + 1, tgt, a);
         int xc2 = opsCnt;
         int costX = opsCnt - cnt0;
-        if (costX + XBIAS >= costY) { ord_ = ordY; parkA = paY; opsOut = outY; opsCnt = cntY; }
+        double penX = parkPen(), penY = 0; { vector<int> t = ord_, q = parkA; ord_ = ordY; parkA = paY; penY = parkPen(); ord_ = t; parkA = q; }
+        if (costX + XBIAS + XPW * (penX - penY) >= costY) { ord_ = ordY; parkA = paY; opsOut = outY; opsCnt = cntY; }
 #ifdef STAT
         else { XS[0]++; XS[1] += xc0 - cnt0; XS[2] += xc1 - xc0; XS[3] += xc2 - xc1; XS[4] += NPORT - 1 - p; STX[0]++; STX[1] += costX; STX[2] += costY; STX[3+min(p,29)]++; return opsCnt; }
 #endif
@@ -855,6 +986,9 @@ int main() {
         if (display() != TG[a]) LOG("mismatch at %d\n", r);
         cout << opsCnt << "\n" << opsOut << flush;
     }
+#ifdef ASTAT
+    for (int t = 0; t < NALT; t++) fprintf(stderr, "%lld ", ACOST[t]); fprintf(stderr, "best %lld\n", ABEST);
+#endif
 #ifdef TIMING
     fprintf(stderr, "TOTAL = %.3f\n", (double)clock() / CLOCKS_PER_SEC);
 #endif
